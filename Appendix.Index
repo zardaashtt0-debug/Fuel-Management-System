@@ -1,0 +1,3185 @@
+Appendix
+
+•	splash
+
+public partial class Splash : Form
+ {
+     private int progressValue = 0;
+     public Splash()
+     {
+         InitializeComponent();    
+     }
+     private void timer1_Tick(object sender, EventArgs e)
+     {
+         progressValue += 2;
+         guna2ProgressBar1.Value = Math.Min(progressValue, 100);
+         if (progressValue >= 100)
+         {
+             timer1.Stop();
+             OpenStartPage();
+         }
+     private void OpenStartPage()
+     {
+         StartPage log = new StartPage();
+         this.Hide();
+         log.Show();
+     }
+     private void Splash_Load(object sender, EventArgs e)
+         guna2ProgressBar1.Value = 0;
+         progressValue = 0;
+         timer1.Interval = 50; 
+         timer1.Start();
+     }
+     private void Splash_Click(object sender, EventArgs e)
+     {
+         timer1.Stop();
+         OpenStartPage();}     
+
+
+
+
+
+•	Start Page
+
+
+public partial class StartPage : Form
+{
+    public StartPage()
+    {
+        InitializeComponent();
+    }
+
+    private void btnAdmin_Click(object sender, EventArgs e)
+    {
+        LoginForm loginForm = new LoginForm("Admin");
+        loginForm.Show();
+        this.Hide();
+    }
+
+    private void btnUser_Click(object sender, EventArgs e)
+    {
+        LoginForm loginForm = new LoginForm("User");
+        loginForm.Show();
+        this.Hide();
+    }
+
+    private void btnExit_Click(object sender, EventArgs e)
+    {
+        Application.Exit();
+    }  
+•	login user
+
+public LoginForm(string userType)
+{
+    InitializeComponent();
+    this.userType = userType;
+    SetupFormForUserType();
+}
+private void SetupFormForUserType()
+{
+    if (userType == "Admin")
+    {
+        Text = "چوونەژوورەوەی بەڕێوەبەر";
+        lblTitle.Text = "چوونەژوورەوەی بەڕێوەبەر 👑";
+        lblTitle.ForeColor = Color.FromArgb(220, 53, 69);
+        btnLogin.BackColor = Color.FromArgb(220, 53, 69);
+        lblInfo.Text = "تکایە ناوی بەکارهێنەر و وشەی نهێنی بەڕێوەبەر بنووسە";
+    }
+    else
+    {
+        Text = "چوونەژوورەوەی بەکارهێنەر";
+        lblTitle.Text = "چوونەژوورەوەی بەکارهێنەر 👤";
+        lblTitle.ForeColor = Color.FromArgb(40, 167, 69);
+        btnLogin.BackColor = Color.FromArgb(40, 167, 69);
+        lblInfo.Text = "تکایە ناوی بەکارهێنەر و وشەی نهێنی بەکارهێنەر بنووسە";
+    }
+}
+
+private void btnLogin_Click_1(object sender, EventArgs e)
+{
+    if (string.IsNullOrWhiteSpace(txtUsername.Text) ||
+        string.IsNullOrWhiteSpace(txtPassword.Text))
+    {
+        MessageBox.Show("تكایە ناوی بەکارهێنەر و وشەی نهێنی پڕبکەرەوە");
+        return;
+    }
+
+    bool result = TryDatabaseLogin();
+}
+
+private bool TryDatabaseLogin()
+{
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+
+            if (userType != "Admin")
+            {
+                string userQuery = "SELECT COUNT(*) FROM Users WHERE Username = @u AND Password = @p";
+
+                SqlCommand cmdUser = new SqlCommand(userQuery, con);
+                cmdUser.Parameters.AddWithValue("@u", txtUsername.Text.Trim());
+                cmdUser.Parameters.AddWithValue("@p", txtPassword.Text.Trim());
+
+                int userCount = (int)cmdUser.ExecuteScalar();
+
+                if (userCount > 0)
+                {
+                    ShowSuccess();
+                    return true;
+                }
+                else
+                {
+                    string checkUserQuery = "SELECT COUNT(*) FROM Users WHERE Username = @u";
+                    SqlCommand checkCmd = new SqlCommand(checkUserQuery, con);
+                    checkCmd.Parameters.AddWithValue("@u", txtUsername.Text.Trim());
+
+                    int userExists = (int)checkCmd.ExecuteScalar();
+
+                    if (userExists > 0)
+                    {
+                        MessageBox.Show("❌ وشەی نهێنی هەڵە!");
+                    }
+                    else
+                    {
+                        MessageBox.Show("❌ ناوی بەکارهێنەر نەدۆزرایەوە!");
+                    }
+                    return false;
+                }
+            }
+            else
+            {
+                string[] adminTables = { "AdminTable", "AdminTb", "admin" };
+
+                foreach (string table in adminTables)
+                {
+                    string q = $"SELECT COUNT(*) FROM {table} WHERE [user]=@u AND [pass]=@p";
+                    SqlCommand cmdAdmin = new SqlCommand(q, con);
+                    cmdAdmin.Parameters.AddWithValue("@u", txtUsername.Text);
+                    cmdAdmin.Parameters.AddWithValue("@p", txtPassword.Text);
+
+                    if ((int)cmdAdmin.ExecuteScalar() > 0)
+                    {
+                        MessageBox.Show($"✔ لە خشتەکەوە وەک Admin چووەتە ژوورەوە: {table}");
+                        ShowSuccess();
+                        return true;
+                    }
+                }
+
+                MessageBox.Show("❌ زانیاری نادرووستە (Admin) !");
+                return false;
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"هەڵە لە پەیوەندی بە بنکەدراوەوە:\n{ex.Message}");
+        return false;
+    }
+}
+
+private void ShowSuccess()
+{
+    string msg = userType == "Admin"
+        ? "بەخێربێیت ئەدمین 👑"
+        : "چوونەژوورەوە سەرکەوتوو بوو 👤";
+
+    MessageBox.Show(msg);
+
+    Dashboard dash = new Dashboard(userType);
+    dash.Show();
+    Hide();
+}
+
+private void CheckAdminTableData()
+{
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+            string q = "SELECT Id, [user], [pass] FROM AdminTable";
+            SqlCommand cmd = new SqlCommand(q, con);
+            SqlDataReader dr = cmd.ExecuteReader();
+
+            string msg = "📌 داتاکانی خشتەی AdminTable:\n\n";
+            bool has = false;
+
+            while (dr.Read())
+            {
+                msg += $"ID: {dr["Id"]} | User: {dr["user"]} | Pass: {dr["pass"]}\n";
+                has = true;
+            }
+            dr.Close();
+
+            if (has) MessageBox.Show(msg);
+            else if (MessageBox.Show("❌ داتا نیە — زیاد بکرێت؟", "", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                AddDefaultAdminData();
+        }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"❌ هەڵە لە دەستکەوتن بە داتا: {ex.Message}");
+    }
+}
+
+private void AddDefaultAdminData()
+{
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+            string q = "INSERT INTO AdminTable ([user],[pass]) VALUES ('admin','123456')";
+            SqlCommand cmd = new SqlCommand(q, con);
+            if (cmd.ExecuteNonQuery() > 0)
+                MessageBox.Show("✨ داتای بنچینەی بەڕێوەبەر زیاد کرا!");
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"❌ هەڵە لە زیادکردنی داتا: {ex.Message}");
+    }
+}
+private void linkLabel1_LinkClicked(object s, LinkLabelLinkClickedEventArgs e)
+{
+    new forget().ShowDialog();
+}
+
+private void pictureBox5_Click(object s, EventArgs e)
+{
+    MessageBox.Show("ئەم سیستەمە بۆ بەڕێوەبردنی فرۆشتن، ڕاپۆرت، و چاودێری سیستەم کاردەکات.\n👑 Admin هەموو صلاحتی هەیە\n👤 User تەنها فرۆشتن");
+}
+private void pictureBox4_Click(object s, EventArgs e) => new support().ShowDialog();
+private void pictureBox2_Click(object s, EventArgs e) => new feedback().ShowDialog();  
+•	Forget Password
+
+public forget()
+ {
+     InitializeComponent();
+     InitializeTimer();
+ }
+ 
+ private void forget_Load(object sender, EventArgs e)
+ {
+     WhatsAppService.ShowYourNumber();
+     InitializeControls();
+     UpdateControls();
+     LoadUserTypes();
+ }
+
+ private void LoadUserTypes()
+ {
+     cmbUserType.Items.Add("بەڕێوەبەر");
+     cmbUserType.Items.Add("کارمەند");
+     cmbUserType.SelectedIndex = 0;
+ }
+
+ private void InitializeControls()
+ {
+     txtVerificationCode.Enabled = false;
+     btnVerifyCode.Enabled = false;
+     txtNewPassword.Enabled = false;
+     txtConfirmPassword.Enabled = false;
+     btnResetPassword.Enabled = false;
+     lblTimer.Visible = false;
+ }
+
+ private void btnSendCode_Click(object sender, EventArgs e)
+ {
+     if (string.IsNullOrWhiteSpace(txtUsername.Text))
+     {
+         MessageBox.Show("❌ تکایە ناوی بەکارهێنەر بنووسە");
+         return;
+     }
+
+     if (cmbUserType.SelectedIndex == -1)
+     {
+         MessageBox.Show("❌ تکایە جۆری بەکارهێنەر هەڵبژێرە");
+         return;
+     }
+
+     username = txtUsername.Text.Trim();
+     userType = cmbUserType.SelectedItem.ToString();
+
+
+     if (!CheckUserExists(username, userType))
+     {
+         MessageBox.Show($"❌ ناوی بەکارهێنەر '{username}' بوونی نیە لە {userType}!\n\nتکایە پشکنینی بکە:\nبەڕێوەبەر: admin\nکارمەند: user");
+         return;
+     }
+
+     
+     GenerateVerificationCode();
+
+     
+     if (WhatsAppService.SendVerificationCode(verificationCode))
+     {
+         MessageBox.Show($"✅ کۆدی پشتڕاستکردنەوە دروست کرا!\nکۆد: {verificationCode}\n(لە ڕێکەوتی تاقیکردنەوە)");
+         txtVerificationCode.Enabled = true;
+         btnVerifyCode.Enabled = true;
+         lblTimer.Visible = true;
+         StartTimer();
+         UpdateControls();
+     }
+     else
+     {
+         MessageBox.Show($"✅ کۆدی پشتڕاستکردنەوە دروست کرا!\nکۆد: {verificationCode}\n(لە ڕێکەوتی تاقیکردنەوە)");
+         txtVerificationCode.Enabled = true;
+         btnVerifyCode.Enabled = true;
+         lblTimer.Visible = true;
+         StartTimer();
+         UpdateControls();
+     }
+ }
+
+
+ private bool CheckUserExists(string username, string userType)
+ 
+     try
+     {
+         using (SqlConnection con = new SqlConnection(connectionString))
+         {
+             con.Open();
+
+             if (userType == "بەڕێوەبەر")
+             {
+                 
+                 string[] adminTables = { "AdminTable", "AdminTb", "admin", "Admins" };
+
+                 foreach (string table in adminTables)
+                 {
+                     if (CheckTableExists(con, table))
+                     {
+                         string adminQuery = $"SELECT COUNT(*) FROM {table} WHERE user = @username OR username = @username";
+                         SqlCommand adminCmd = new SqlCommand(adminQuery, con);
+                         adminCmd.Parameters.AddWithValue("@username", username);
+
+                         int count = (int)adminCmd.ExecuteScalar();
+                         if (count > 0)
+                         {
+                             return true;
+                         }
+                     }
+                 }
+                 return false;
+             }
+             else if (userType == "کارمەند")
+             {
+                 if (CheckTableExists(con, "Users"))
+                 {
+                     string userQuery = "SELECT COUNT(*) FROM Users WHERE Username = @username";
+                     SqlCommand userCmd = new SqlCommand(userQuery, con);
+                     userCmd.Parameters.AddWithValue("@username", username);
+                     return (int)userCmd.ExecuteScalar() > 0;
+                 }
+                 return false;
+             }
+             return false;
+         }
+     }
+     catch (Exception ex)
+     {
+         MessageBox.Show($"هەڵە لە پشکنینی بەکارهێنەر: {ex.Message}");
+         return false;
+     }
+ }
+
+ private bool CheckTableExists(SqlConnection connection, string tableName)
+ {
+     try
+     {
+         SqlCommand cmd = new SqlCommand(
+             $"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{tableName}'",
+             connection);
+         int count = (int)cmd.ExecuteScalar();
+         return count > 0;
+     }
+     catch
+     {
+         return false;
+     }
+ }
+
+ private void btnVerifyCode_Click(object sender, EventArgs e)
+ {
+     if (string.IsNullOrWhiteSpace(txtVerificationCode.Text))
+     {
+         MessageBox.Show("❌ تکایە کۆدی پشتڕاستکردنەوە بنووسە");
+         return;
+     }
+
+     if (VerifyCode())
+     {
+         MessageBox.Show("✅ پشتڕاستکردنەوە سەرکەوتوو بوو! ئێستا دەتوانیت وشەی نهێنی نوێ بنووسیت.");
+         txtNewPassword.Enabled = true;
+         txtConfirmPassword.Enabled = true;
+         btnResetPassword.Enabled = true;
+         UpdateControls();
+     }
+     else
+     {
+         MessageBox.Show("❌ کۆدی پشتڕاستکردنەوە هەڵەیە یان کاتی تیاچوون!");
+     }
+ }
+
+ private void btnResetPassword_Click(object sender, EventArgs e)
+ {
+     if (ResetPassword())
+     {
+         MessageBox.Show("✅ گۆڕینی وشەی نهێنی سەرکەوتوو بوو!");
+         this.Close();
+     }
+ }
+
+ private void btnResendCode_Click(object sender, EventArgs e)
+ {
+     btnSendCode_Click(sender, e);
+ }
+
+ private void GenerateVerificationCode()
+ {
+     Random random = new Random();
+     verificationCode = random.Next(100000, 999999).ToString();
+     codeExpiry = DateTime.Now.AddMinutes(10);
+ }
+
+ private bool VerifyCode()
+ {
+     return txtVerificationCode.Text == verificationCode && DateTime.Now <= codeExpiry;
+ }
+
+ private bool ResetPassword()
+ {
+     if (string.IsNullOrWhiteSpace(txtNewPassword.Text))
+     {
+         MessageBox.Show("❌ تکایە وشەی نهێنی نوێ بنووسە");
+         return false;
+     }
+
+     if (txtNewPassword.Text != txtConfirmPassword.Text)
+     {
+         MessageBox.Show("❌ وشەی نهێنی یەک ناگرێتەوە!");
+         return false;
+     }
+
+     if (txtNewPassword.Text.Length < 4)
+     {
+         MessageBox.Show("❌ وشەی نهێنی دەبێت بەلایەنی کەمەوە 4 پیت بێت!");
+         return false;
+     }
+
+     return UpdatePasswordInDatabase(username, userType, txtNewPassword.Text);
+ }
+
+ private bool UpdatePasswordInDatabase(string username, string userType, string newPassword)
+ {
+     try
+     {
+         using (SqlConnection con = new SqlConnection(connectionString))
+         {
+             con.Open();
+
+             if (userType == "بەڕێوەبەر")
+             {
+                 
+                 string[] adminTables = { "AdminTable", "AdminTb", "admin" };
+
+                 foreach (string table in adminTables)
+                 {
+                     if (CheckTableExists(con, table))
+                     {
+                         
+                         string[] passwordColumns = { "pass", "pass", "pass" };
+                         string[] userColumns = { "user", "user", "user" };
+
+                         foreach (string passCol in passwordColumns)
+                         {
+                             foreach (string userCol in userColumns)
+                             {
+                                 try
+                                 {
+                                     string adminQuery = $"UPDATE {table} SET {passCol} = @password WHERE {userCol} = @username";
+                                     SqlCommand adminCmd = new SqlCommand(adminQuery,con)    adminCmd.Parameters.AddWithValue("@password", newPassword);                                     adminCmd.Parameters.AddWithValue("@username", username);
+
+                                     int rowsAffected = adminCmd.ExecuteNonQuery();
+                                     if (rowsAffected > 0)
+                                     {
+                                         return true;
+                                     }
+                                 }
+                                 catch
+                                 {
+                                     
+                                     continue;
+                                 }
+                             }
+                         }
+                     }
+                 }
+                 return false;
+             }
+             else if (userType == "کارمەند")
+             {
+                 if (CheckTableExists(con, "Users"))
+                 {
+                     string userQuery = "UPDATE Users SET Password = @password WHERE Username = @username";
+                     SqlCommand userCmd = new SqlCommand(userQuery, con);
+                     userCmd.Parameters.AddWithValue("@password", newPassword);
+                     userCmd.Parameters.AddWithValue("@username", username);
+                     return userCmd.ExecuteNonQuery() > 0;
+                 }
+                 return false;
+             }
+
+             return false;
+         }
+     }
+     catch (Exception ex)
+     {
+         MessageBox.Show($"هەڵە لە نوێکردنەوەی وشەی نهێنی: {ex.Message}");
+         return false;
+     }
+ }
+
+ private void InitializeTimer()
+ {
+     timer = new Timer();
+     timer.Interval = 1000;
+     timer.Tick += Timer_Tick;
+ }
+
+ private void StartTimer()
+ {
+     timer.Start();
+ }
+
+ private void Timer_Tick(object sender, EventArgs e)
+ {
+     TimeSpan remaining = codeExpiry - DateTime.Now;
+
+     if (remaining.TotalSeconds > 0)
+     {
+         lblTimer.Text = $"⏰ کات ماوە: {remaining:mm\\:ss}";
+     }
+     else
+     {
+         lblTimer.Text = "⏰ کۆدەکە بەسەرچووە!";
+         txtVerificationCode.Enabled = false;
+         btnVerifyCode.Enabled = false;
+         timer.Stop();
+     }
+ }
+
+ private void UpdateControls()
+ {
+     bool codeSent = !string.IsNullOrEmpty(verificationCode);
+     bool codeVerified = codeSent && VerifyCode();
+
+     if (codeSent && !codeVerified)
+     {
+         txtVerificationCode.Enabled = true;
+         btnVerifyCode.Enabled = true;
+         lblTimer.Visible = true;
+         txtNewPassword.Enabled = false;
+         txtConfirmPassword.Enabled = false;
+         btnResetPassword.Enabled = false;
+     }
+     else if (codeVerified)
+     {
+         txtVerificationCode.Enabled = false;
+         btnVerifyCode.Enabled = false;
+         txtNewPassword.Enabled = true;
+         txtConfirmPassword.Enabled = true;
+         btnResetPassword.Enabled = true;
+         lblTimer.Visible = false;
+     }
+     else
+     {
+         txtVerificationCode.Enabled = false;
+         btnVerifyCode.Enabled = false;
+         txtNewPassword.Enabled = false;
+         txtConfirmPassword.Enabled = false;
+         btnResetPassword.Enabled = false;
+         lblTimer.Visible = false;
+     }
+ }
+private void btnCheckDatabase_Click(object sender, EventArgs e)
+ {
+     CheckAndCreateDatabase();
+ }
+
+ private void CheckAndCreateDatabase()
+ {
+     try
+     {
+         using (SqlConnection con = new SqlConnection(connectionString))
+         {
+             con.Open();
+
+             string message = "خشتەکانی بنکەی دراوە:\n\n";
+
+             string query = "SELECT name FROM sys.tables ORDER BY name";
+             SqlCommand cmd = new SqlCommand(query, con);
+             SqlDataReader dr = cmd.ExecuteReader();
+          bool hasTables = false;
+             while (dr.Read())
+             {
+                 message += $"• {dr["name"]}\n";
+                 hasTables = true;
+             }
+             dr.Close();
+
+             if (!hasTables)
+             {
+                 message += "❌ هیچ خشتەیەک نەدۆزرایەوە!\n";
+                  
+                 if (MessageBox.Show("ئایا دەتەوێت خشتەی بنچینەی دروست بکەیت؟", "دروستکردنی خشتە", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                 {
+                     CreateDefaultTables(con);
+                 }
+             }
+
+             MessageBox.Show(message, "خشتەکان");
+         }
+     }
+     catch (Exception ex)
+     {
+         MessageBox.Show($"هەڵە لە پشکنینی بنکەی دراوە: {ex.Message}");
+     }
+ }
+
+ private void CreateDefaultTables(SqlConnection con)
+ {
+     try
+       
+         string createAdminTable = @"
+         IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AdminTable' AND xtype='U')
+         CREATE TABLE AdminTable (
+             id INT PRIMARY KEY IDENTITY(1,1),
+             user NVARCHAR(50) NOT NULL,
+             pass NVARCHAR(100) NOT NULL
+         )";
+
+         SqlCommand cmd1 = new SqlCommand(createAdminTable, con);
+         cmd1.ExecuteNonQuery();
+
+         string insertAdmin = @"
+         IF NOT EXISTS (SELECT * FROM AdminTable WHERE user = 'admin')
+         INSERT INTO AdminTable (user, pass) VALUES ('admin', '123456')";
+
+         SqlCommand cmd2 = new SqlCommand(insertAdmin, con);
+         cmd2.ExecuteNonQuery();
+
+         string createUsersTable = @"
+         IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Users' AND xtype='U')
+         CREATE TABLE Users (
+             Id INT PRIMARY KEY IDENTITY(1,1),
+             Username NVARCHAR(50) NOT NULL,
+             Password NVARCHAR(100) NOT NULL
+         )";
+
+         SqlCommand cmd3 = new SqlCommand(createUsersTable, con);
+         cmd3.ExecuteNonQuery();
+
+         
+         string insertUser = @"
+         IF NOT EXISTS (SELECT * FROM Users WHERE Username = 'user')
+         INSERT INTO Users (Username, Password) VALUES ('user', '123456')";
+
+         SqlCommand cmd4 = new SqlCommand(insertUser, con);
+         cmd4.ExecuteNonQuery();
+
+         MessageBox.Show("✅ خشتەکان دروست کران!\n\n" +
+                       "بەڕێوەبەر:\nناوی بەکارهێنەر: admin\nوشەی نهێنی: 123456\n\n" +
+                       "کارمەند:\nناوی بەکارهێنەر: user\nوشەی نهێنی: 123456");
+     }
+     catch (Exception ex)
+     {
+         MessageBox.Show($"❌ هەڵە لە دروستکردنی خشتە: {ex.Message}");
+     }
+ }
+ 
+•	The sales process
+
+        public SalesForm(string userType)
+        {
+            InitializeComponent();
+            this.userType = userType;
+            LoadFuelTypes();
+            SetupForm();
+            InitializePaymentSection();
+            InitializePrintDocument();
+        }
+
+        private void SetupForm()
+        {
+            txtQuantity.Enabled = false;
+            txtCustomer.Enabled = false;
+            txtVehicle.Enabled = false;
+            btnSell.Enabled = false;
+
+            lblAvailableQuantity.Text = " 0 لیتر";
+            lblPriceInfo.Text = "نرخ: 0 دینار";
+            lblMessage.Text = "تکایە جۆری سووتەمەنی هەڵبژێرە";
+            lblMessage.ForeColor = Color.Blue;
+        }
+
+        private void InitializePaymentSection()
+        {
+            rbtnCash.Checked = true;
+            paymentMethod = "پارەی نەختی";
+            panelBarcode.Visible = false;
+            btnScanBarcode.Enabled = false;
+        }
+
+        private void InitializePrintDocument()
+        {
+            printDocument = new PrintDocument();
+            printDocument.PrintPage += new PrintPageEventHandler(PrintReceiptPage);
+        }
+
+        private void LoadFuelTypes()
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+
+                    string query = "SELECT DISTINCT FuelType FROM Products WHERE Quantity > 0";
+                    SqlCommand cmd = new SqlCommand(query, con);
+                    SqlDataReader reader = cmd.ExecuteReader();
+
+                    cmbFuelType.Items.Clear();
+                    while (reader.Read())
+                    {
+                        cmbFuelType.Items.Add(reader["FuelType"].ToString());
+                    }
+                    reader.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("هەڵە لە بارکردنی جۆرەکانی سووتەمەنی: " + ex.Message);
+            }
+        }
+
+        private void cmbFuelType_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (cmbFuelType.SelectedItem != null)
+            {
+                string selectedFuel = cmbFuelType.SelectedItem.ToString();
+                LoadFuelDetails(selectedFuel);
+            }
+        }
+
+        private void LoadFuelDetails(string fuelType)
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+
+                    string query = "SELECT PricePerLiter, Quantity FROM Products WHERE FuelType = @FuelType";
+                    SqlCommand cmd = new SqlCommand(query, con);
+                    cmd.Parameters.AddWithValue("@FuelType", fuelType);
+
+                    SqlDataReader reader = cmd.ExecuteReader();
+
+                    if (reader.Read())
+                    {
+                        decimal price = Convert.ToDecimal(reader["PricePerLiter"]);
+                        decimal quantity = Convert.ToDecimal(reader["Quantity"]);
+
+                        txtPrice.Text = price.ToString("N2");
+                        lblAvailableQuantity.Text = "بڕ: " + quantity.ToString("N2") + " لیتر";
+                        lblPriceInfo.Text = "نرخ: " + price.ToString("N2") + " دینار";
+
+                        txtQuantity.Enabled = true;
+                        txtCustomer.Enabled = true;
+                        txtVehicle.Enabled = true;
+
+                        lblMessage.Text = "دەتوانیت فرۆشتن بکەیت";
+                        lblMessage.ForeColor = Color.Green;
+
+                        panelPayment.Enabled = true;
+                        btnScanBarcode.Enabled = true;
+                        CheckIfReadyToSell();
+                    }
+                    reader.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("هەڵە لە بارکردنی زانیاریی سووتەمەنی: " + ex.Message);
+            }
+        }
+
+        private void txtQuantity_TextChanged(object sender, EventArgs e)
+        {
+            CalculateTotal();
+            CheckQuantity();
+            CheckIfReadyToSell();
+        }
+
+        private void txtPrice_TextChanged(object sender, EventArgs e)
+        {
+            CalculateTotal();
+            CheckIfReadyToSell();
+        }
+
+        private void txtCustomer_TextChanged(object sender, EventArgs e)
+        {
+            CheckIfReadyToSell();
+        }
+
+        private void CheckQuantity()
+        {
+            if (cmbFuelType.SelectedItem == null) return;
+
+            if (decimal.TryParse(txtQuantity.Text, out decimal requestedQuantity))
+            {
+                string availableText = lblAvailableQuantity.Text.Replace("بڕ:", "").Replace("لیتر", "").Trim();
+                if (decimal.TryParse(availableText, out decimal availableQuantity))
+                {
+                    if (requestedQuantity > availableQuantity)
+                    {
+                        lblMessage.Text = "ئەم بڕە لە کەل و پەلدا نیە! (ماوە: " + availableQuantity.ToString("N2") + " لیتر)";
+                        lblMessage.ForeColor = Color.Red;
+                    }
+                    else if (requestedQuantity <= 0)
+                    {
+                        lblMessage.Text = "بڕەکە دەبێت زیاتر بێت لە سفر!";
+                        lblMessage.ForeColor = Color.Red;
+                    }
+                    else
+                    {
+                        lblMessage.Text = "بڕەکە بەردەستە";
+                        lblMessage.ForeColor = Color.Green;
+                    }
+                }
+            }
+            else if (!string.IsNullOrEmpty(txtQuantity.Text))
+            {
+                lblMessage.Text = "تکایە بڕەکە بە شێوەیەکی ڕاست بنووسە!";
+                lblMessage.ForeColor = Color.Red;
+            }
+        }
+
+        private void CalculateTotal()
+        {
+            if (decimal.TryParse(txtQuantity.Text, out decimal quantity) &&
+                decimal.TryParse(txtPrice.Text, out decimal price))
+            {
+                decimal total = quantity * price;
+                lblTotal.Text = total.ToString("N2") + " دینار";
+            }
+            else
+            {
+                lblTotal.Text = "0.00 دینار";
+            }
+        }
+
+        private void rbtnCash_CheckedChanged_1(object sender, EventArgs e)
+        {
+            if (rbtnCash.Checked)
+            {
+                paymentMethod = "نقد";
+                panelBarcode.Visible = false;
+                btnScanBarcode.Enabled = true;
+                CheckIfReadyToSell();
+            }
+        }
+
+        private void rbtnCard_CheckedChanged_1(object sender, EventArgs e)
+        {
+            if (rbtnCard.Checked)
+            {
+                paymentMethod = "کارت";
+                panelBarcode.Visible = true;
+                txtBarcode.Focus();
+                btnScanBarcode.Enabled = true;
+                CheckIfReadyToSell();
+            }
+        }
+
+        private void CheckIfReadyToSell()
+        {
+            bool isFuelSelected = cmbFuelType.SelectedItem != null;
+            bool isQuantityValid = decimal.TryParse(txtQuantity.Text, out decimal qty) && qty > 0;
+            bool isCustomerEntered = !string.IsNullOrWhiteSpace(txtCustomer.Text);
+            bool isPaymentSelected = !string.IsNullOrEmpty(paymentMethod);
+            bool isCardBarcodeValid = true;
+
+            if (paymentMethod == "کارت")
+            {
+                isCardBarcodeValid = !string.IsNullOrWhiteSpace(txtBarcode.Text);
+            }
+
+            btnSell.Enabled = isFuelSelected && isQuantityValid && isCustomerEntered && isPaymentSelected && isCardBarcodeValid;
+        }
+
+        private void txtBarcode_TextChanged_1(object sender, EventArgs e)
+        {
+            barcodeNumber = txtBarcode.Text;
+            CheckIfReadyToSell();
+        }
+
+        private void btnScanBarcode_Click(object sender, EventArgs e)
+        {
+            if (paymentMethod == "کارت")
+            {
+                ProcessCardPayment();
+            }
+            else if (paymentMethod == "نقد")
+            {
+                ProcessCashPayment();
+            }
+        }
+
+        private void ProcessCardPayment()
+        {
+            using (CardPaymentForm cardForm = new CardPaymentForm())
+            {
+                if (cardForm.ShowDialog() == DialogResult.OK)
+                {
+                    txtBarcode.Text = $"کارت-{DateTime.Now:HHmmss}";
+                    barcodeNumber = txtBarcode.Text;
+                    MessageBox.Show("پارەدانی کارت سەرکەوتوو بوو!", "سەرکەوتوو");
+                }
+            }
+        }
+
+        private void ProcessCashPayment()
+        {
+            txtBarcode.Text = $"نقد-{DateTime.Now:HHmmss}";
+            barcodeNumber = txtBarcode.Text;
+            MessageBox.Show("بارکۆدی نقد دروست کرا!", "نقد");
+        }
+
+        private void btnSell_Click_1(object sender, EventArgs e)
+        {
+            if (ValidateSale())
+            {
+                ProcessSale();
+            }
+        private bool ValidateSale()
+        {
+            if (cmbFuelType.SelectedIndex == -1)
+            {
+                MessageBox.Show("تکایە جۆری سووتەمەنی هەڵبژێرە");
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(txtQuantity.Text) || !decimal.TryParse(txtQuantity.Text, out decimal quantity))
+            {
+                MessageBox.Show("تکایە بڕی سووتەمەنی بنووسە بە شێوەیەکی دروست");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtCustomer.Text))
+            {
+                MessageBox.Show("تکایە ناوی کڕیار بنووسە");
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(paymentMethod))
+            {
+                MessageBox.Show("تکایە شێوازی پارەدان هەڵبژێرە");
+                return false;
+            }
+
+            if (paymentMethod == "کارت" && string.IsNullOrWhiteSpace(txtBarcode.Text))
+            {
+                MessageBox.Show("تکایە بارکۆدەکە بخوێنەرەوە یان دووگمەی سکانکردن کرتە بکە");
+                return false;
+            }
+            string availableText = lblAvailableQuantity.Text.Replace("کەل و پەل:", "").Replace("لیتر", "").Trim();
+            if (decimal.TryParse(availableText, out decimal availableQuantity))
+            {
+                if (quantity > availableQuantity)
+                {
+                    MessageBox.Show("بڕەکە زیاترە لە ئەوەی لە کەل و پەلدا هەیە! کەل و پەل: " + availableQuantity.ToString("N2") + " لیتر");
+                    return false;
+            return true;
+        }
+
+        private void ProcessSale()
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+                   SqlTransaction transaction = con.BeginTransaction();
+
+                    try
+                    {
+                        currentFuelType = cmbFuelType.SelectedItem.ToString();
+                        currentQuantity = decimal.Parse(txtQuantity.Text);
+                        currentPrice = decimal.Parse(txtPrice.Text);
+                        currentTotal = currentQuantity * currentPrice;
+                        currentCustomer = txtCustomer.Text;
+                        currentVehicle = txtVehicle.Text;
+
+                        string updateInventoryQuery = @" UPDATE Products 
+                        SET Quantity = Quantity - @Quantity 
+                        WHERE FuelType = @FuelType AND Quantity >= @Quantity";
+
+                        SqlCommand updateCmd = new SqlCommand(updateInventoryQuery, con, transaction);
+                        updateCmd.Parameters.AddWithValue("@Quantity", currentQuantity);
+                        updateCmd.Parameters.AddWithValue("@FuelType", currentFuelType);
+
+                        int inventoryResult = updateCmd.ExecuteNonQuery();
+
+                        if (inventoryResult == 0)
+                        {
+                            throw new Exception("کەل و پەل بە سەرکەوتوویی نوێ نەکرایەوە!");
+                        }
+                        string insertSaleQuery = @"
+                        INSERT INTO Sales (FuelType, Quantity, PricePerLiter, TotalAmount, 
+                                          CustomerName, VehicleNumber,SaleDate  ) 
+                        VALUES (@FuelType, @Quantity, @Price, @Total, @Customer, @Vehicle,   @SaleDate )";
+
+  SqlCommand saleCmd = new SqlCommand(insertSaleQuery, con, transaction);
+  saleCmd.Parameters.AddWithValue("@FuelType", currentFuelType);
+     saleCmd.Parameters.AddWithValue("@Quantity", currentQuantity);
+      saleCmd.Parameters.AddWithValue("@Price", currentPrice);
+       saleCmd.Parameters.AddWithValue("@Total", currentTotal);
+        saleCmd.Parameters.AddWithValue("@Customer", currentCustomer);
+        saleCmd.Parameters.AddWithValue("@Vehicle", currentVehicle);
+saleCmd.Parameters.AddWithValue("@PaymentMethod", paymentMethod);  saleCmd.Parameters.AddWithValue("@Barcode", barcodeNumber ?? "");*/  saleCmd.Parameters.AddWithValue("@SaleDate", DateTime.Now);
+                        int saleResult = saleCmd.ExecuteNonQuery();
+                        if (saleResult > 0)
+                        {
+                            transaction.Commit();
+                            ShowSuccessMessage();
+                            PrintReceiptNow();
+                            ResetForm();
+                    catch (Exception ex)
+                    {
+                        transaction.Rollback();
+                        throw new Exception("هەڵە لە پرۆسەی فرۆشتن: " + ex.Message);            catch (Exception ex)
+            {
+                MessageBox.Show("❌ هەڵە: " + ex.Message, "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ShowSuccessMessage()
+        {
+            MessageBox.Show("✅ فرۆشتنەکە بە سەرکەوتوویی تەواو بوو!\n\n" +
+                          "جۆری سووتەمەنی: " + currentFuelType +
+                          "\nبڕ: " + currentQuantity.ToString("N2") + " لیتر" +
+                          "\nکۆی گشتی: " + currentTotal.ToString("N2") + " دینار" +
+                          "\nکڕیار: " + currentCustomer +
+                          "\nشێوازی پارەدان: " + paymentMethod,
+                          "سەرکەوتوو", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void PrintReceiptNow()
+        {
+            try
+            {
+                PrintPreviewDialog preview = new PrintPreviewDialog();
+                preview.Document = printDocument;
+                preview.Text = "پێشبینینی پەسەندەر";
+                preview.WindowState = FormWindowState.Maximized;
+                preview.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("هەڵە لە پێشبینینی پەسەندەر: " + ex.Message);
+            }
+        }
+
+        private void PrintReceiptPage(object sender, PrintPageEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            Font titleFont = new Font("Arial", 20, FontStyle.Bold);
+            Font headerFont = new Font("Arial", 12, FontStyle.Bold);
+            Font normalFont = new Font("Arial", 10);
+            Font smallFont = new Font("Arial", 9);
+
+            float yPos = 50;
+            float center = e.MarginBounds.Width / 2;
+
+        g.DrawString("پەسەندەری فرۆشتن", titleFont, Brushes.DarkBlue, center - 100, yPos);
+            yPos += 40;
+
+            g.DrawString("وێستگەی سووتەمەنی", headerFont, Brushes.Black, center - 80, yPos);
+            yPos += 25;
+            g.DrawString("تەلەفۆن: ٠٧٧٠ ١٢٣ ٤٥٦٧", normalFont, Brushes.Black, center - 70, yPos);
+            yPos += 40;
+
+            g.DrawLine(Pens.Black, 50, yPos, e.MarginBounds.Width - 50, yPos);
+            yPos += 20;
+
+            g.DrawString("ناوی کڕیار:", headerFont, Brushes.Black, 50, yPos);
+            g.DrawString(currentCustomer, normalFont, Brushes.Black, 200, yPos);
+            yPos += 25;
+
+            g.DrawString("ژمارەی سەیارە:", headerFont, Brushes.Black, 50, yPos);
+            g.DrawString(currentVehicle, normalFont, Brushes.Black, 200, yPos);
+            yPos += 25;
+
+            g.DrawString("جۆری سووتەمەنی:", headerFont, Brushes.Black, 50, yPos);
+            g.DrawString(currentFuelType, normalFont, Brushes.Black, 200, yPos);
+            yPos += 25;
+
+            g.DrawString("بڕ (لیتر):", headerFont, Brushes.Black, 50, yPos);
+            g.DrawString(currentQuantity.ToString("N2"), normalFont, Brushes.Black, 200, yPos);
+            yPos += 25;
+
+            g.DrawString("نرخ:", headerFont, Brushes.Black, 50, yPos);
+            g.DrawString(currentPrice.ToString("N2") + " دینار", normalFont, Brushes.Black, 200, yPos);
+            yPos += 25;
+
+            g.DrawString("کۆی گشتی:", headerFont, Brushes.Black, 50, yPos);
+            g.DrawString(currentTotal.ToString("N2") + " دینار", normalFont, Brushes.Black, 200, yPos);
+            yPos += 25;
+
+            g.DrawString("شێوازی پارەدان:", headerFont, Brushes.Black, 50, yPos);
+            g.DrawString(paymentMethod, normalFont, Brushes.Black, 200, yPos);
+            yPos += 25;
+
+            if (paymentMethod == "کارت")
+            {
+                g.DrawString("ژمارەی کارت:", headerFont, Brushes.Black, 50, yPos);
+                g.DrawString(barcodeNumber, normalFont, Brushes.Black, 200, yPos);
+                yPos += 25;
+            }
+
+            g.DrawString("بەروار:", headerFont, Brushes.Black, 50, yPos);
+            g.DrawString(DateTime.Now.ToString("yyyy/MM/dd HH:mm"), normalFont, Brushes.Black, 200, yPos);
+            yPos += 40;
+
+            g.DrawLine(Pens.Black, 50, yPos, e.MarginBounds.Width - 50, yPos);
+            yPos += 20;
+
+            g.DrawString("سوپاس بۆ داواکاریەکەت! ✨", headerFont, Brushes.DarkGreen, center - 100, yPos);
+            yPos += 40;
+
+            g.DrawString("واژۆی کارمەند", headerFont, Brushes.Black, center - 60, yPos);
+            yPos += 20;
+            g.DrawLine(Pens.Black, center - 80, yPos, center + 80, yPos);
+
+            string receiptNo = "RN" + DateTime.Now.ToString("yyyyMMddHHmmss");
+            g.DrawString("ژمارەی پەسەندەر: " + receiptNo, smallFont, Brushes.Black, 50, e.MarginBounds.Bottom - 30);
+        }
+
+        private void ResetForm()
+        {
+            cmbFuelType.SelectedIndex = -1;
+            txtQuantity.Clear();
+            txtCustomer.Clear();
+            txtVehicle.Clear();
+            txtPrice.Clear();
+            txtBarcode.Clear();
+            lblTotal.Text = "0.00 دینار";
+            lblAvailableQuantity.Text = ": 0 لیتر";
+            lblPriceInfo.Text = "نرخ: 0 دینار";
+            lblMessage.Text = "تکایە جۆری سووتەمەنی هەڵبژێرە";
+            lblMessage.ForeColor = Color.Blue;
+
+            rbtnCash.Checked = true;
+            panelBarcode.Visible = false;
+            paymentMethod = "نقد";
+            barcodeNumber = "";
+
+            txtQuantity.Enabled = false;
+            txtCustomer.Enabled = false;
+            txtVehicle.Enabled = false;
+            btnSell.Enabled = false;
+            btnScanBarcode.Enabled = false;
+
+            LoadFuelTypes();
+        }
+
+        private void btnCancel_Click_1(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+
+        private void btnRefresh__Click(object sender, EventArgs e)
+        {
+            if (cmbFuelType.SelectedItem != null)
+            {
+                LoadFuelDetails(cmbFuelType.SelectedItem.ToString());
+                CalculateTotal();
+            }
+            else
+            {
+                LoadFuelTypes();
+            }
+        }
+        private void lblTotal_Click(object sender, EventArgs e) { }
+
+        private void lblAvailableQuantity_Click(object sender, EventArgs e) { }
+
+        private void btnCheckTables_Click_1(object sender, EventArgs e)
+        {
+            CheckDatabaseTables();
+        private void CheckDatabaseTables()
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+                   string query = @"
+                    SELECT 
+                        CASE 
+                            WHEN OBJECT_ID('Products') IS NOT NULL THEN '✅ Products'
+                            ELSE '❌ Products'
+                        END as 'خشتەی ١',
+                        CASE 
+                            WHEN OBJECT_ID('Sales') IS NOT NULL THEN '✅ Sales'
+                            ELSE '❌ Sales'
+                        END as 'خشتەی ٢'";
+
+                    SqlCommand cmd = new SqlCommand(query, con);
+                    SqlDataReader reader = cmd.ExecuteReader();
+
+                    if (reader.Read())
+                    {
+                        MessageBox.Show($"پشکنینی خشتەکان:\n\n{reader[0]}\n{reader[1]}",
+         "پشکنین", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    reader.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("هەڵە لە پشکنینی خشتەکان: " + ex.Message);
+         
+        private void btnRefresh__Click_1(object sender, EventArgs e)
+        private void label8_Click(object sender, EventArgs e)
+        {
+            FeedbackForm a = new FeedbackForm();
+            a.Show();
+        }
+ 
+•	Costumer feedback
+
+
+        private void FeedbackForm_Load(object sender, EventArgs e)
+        {
+            dateFeedback.Value = DateTime.Now;
+            comboRating.SelectedIndex = 4;
+        }
+
+        private void btnSubmit_Click(object sender, EventArgs e)
+        {
+            if (!پشکنینی_بوارەکان()) return;
+
+            try
+            {
+
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+                    دڵنیابوون_لە_بوونی_جدول(con);
+                    string query = @"INSERT INTO Feedbacks (CustomerName, Email, Rating, Comment, ProductName, FeedbackDate, IsApproved) 
+                                   VALUES (@CustomerName, @Email, @Rating, @Comment, @ProductName, @FeedbackDate, @IsApproved)";
+
+                    SqlCommand cmd = new SqlCommand(query, con);
+                    cmd.Parameters.AddWithValue("@CustomerName", txtCustomerName.Text);
+                    cmd.Parameters.AddWithValue("@Email", txtEmail.Text);
+                    cmd.Parameters.AddWithValue("@Rating", comboRating.SelectedIndex + 1);
+                    cmd.Parameters.AddWithValue("@Comment", txtComment.Text);
+                    cmd.Parameters.AddWithValue("@ProductName", txtProductName.Text);
+                    cmd.Parameters.AddWithValue("@FeedbackDate", dateFeedback.Value);
+                    cmd.Parameters.AddWithValue("@IsApproved", 1); 
+
+                    int result = cmd.ExecuteNonQuery();
+                    if (result > 0)
+                    {
+                        MessageBox.Show("سوپاس بۆ فیدباکەکەت! فیدباکەکەت پێداچوونەوەی بۆ دەکرێت.", "سەرکەوتوو");
+                        پاکردنەوەی_بوارەکان();
+                    }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"هەڵە: {ex.Message}", "هەڵە");
+            }
+        }
+        private bool پشکنینی_بوارەکان()
+        {
+            if (string.IsNullOrEmpty(txtCustomerName.Text))
+            {
+                MessageBox.Show("تکایە ناوی خۆت بنووسە", "ئاگاداری");
+                txtCustomerName.Focus();
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(txtComment.Text))
+            {
+                MessageBox.Show("تکایە بۆچوونی خۆت بنووسە", "ئاگاداری");
+                txtComment.Focus();
+                return false;
+            }
+
+            if (comboRating.SelectedIndex == -1)
+            {
+                MessageBox.Show("تکایە هەڵسەنگاندن دیاری بکە", "ئاگاداری");
+                comboRating.Focus();
+                return false;
+            }
+
+            return true;
+        }
+        private void دڵنیابوون_لە_بوونی_جدول(SqlConnection con)
+        {
+            string checkTableQuery = @"
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Feedbacks' AND xtype='U')
+                BEGIN
+                    CREATE TABLE Feedbacks (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,
+                        CustomerName NVARCHAR(100) NOT NULL,
+                        Email NVARCHAR(100) NULL,
+                        Rating INT NOT NULL,
+                        Comment NVARCHAR(500) NOT NULL,
+                        ProductName NVARCHAR(100) NULL,
+                        FeedbackDate DATETIME NOT NULL,
+                        IsApproved BIT DEFAULT 0 NOT NULL
+                    )
+                END";
+
+            SqlCommand checkCmd = new SqlCommand(checkTableQuery, con);
+            checkCmd.ExecuteNonQuery();
+        }
+
+        private void پاکردنەوەی_بوارەکان()
+        {
+            txtCustomerName.Clear();
+            txtEmail.Clear();
+            txtComment.Clear();
+            txtProductName.Clear();
+            comboRating.SelectedIndex = 4;
+            dateFeedback.Value = DateTime.Now;
+            txtCustomerName.Focus();
+        }
+
+        private void btnCancel_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+    }
+}
+
+ 
+
+•	Panel
+
+        public Dashboard(string userType)
+        {
+            InitializeComponent();
+            this.userType = userType;
+            ApplyUserPermissions();
+            CheckAdminPermission();
+        }
+
+        private void ApplyUserPermissions()
+        {
+            if (userType == "User")
+            {
+                
+                btnAddFuel.Visible = false;
+                guna2GradientButton3.Visible = false; 
+                btnInventory.Visible = false;
+                guna2GradientButton1.Visible = false;
+                guna2GradientButton4.Visible = false;
+
+
+                btnSales.Visible = true;
+                btnSales.Location = new Point(300, 150);
+                btnSales.Size = new Size(250, 60);
+                btnSales.Font = new Font("Tahoma", 14F, FontStyle.Bold);
+                btnSales.BackColor = Color.FromArgb(40, 167, 69); 
+                btnSales.ForeColor = Color.White;
+
+                
+                lblTitle.Text = "بەخێربێیت - سیستمێکی فرۆشتن";
+                lblTitle.ForeColor = Color.Blue;
+
+                
+                Label lblUserType = new Label();
+                lblUserType.Text = "بەکارهێنەر";
+                lblUserType.Font = new Font("Tahoma", 12F, FontStyle.Bold);
+                lblUserType.ForeColor = Color.Blue;
+                lblUserType.Location = new Point(200, 40);
+                lblUserType.Size = new Size(120, 25);
+                this.Controls.Add(lblUserType);
+
+                MessageBox.Show("بەخێربێیت! تەنها دەتوانیت فرۆشتن بکەیت.", "بەخێربێیت", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                
+                btnAddFuel.Visible = true;
+                guna2GradientButton3.Visible = true;
+                btnInventory.Visible = true;
+                guna2GradientButton1.Visible = true;
+                btnSales.Visible = true;
+
+                lblTitle.Text = "بەخێربێیت ";
+
+                
+                Label lblUserType = new Label();
+                lblUserType.Text = "بەڕێوەبەر";
+                lblUserType.Font = new Font("Tahoma", 12F, FontStyle.Bold);
+                lblUserType.ForeColor = Color.Red;
+                lblUserType.Location = new Point(200, 40);
+                lblUserType.Size = new Size(120, 25);
+                this.Controls.Add(lblUserType);
+            }
+        }
+
+        private void btnSales_Click(object sender, EventArgs e)
+        {
+            SalesForm salesForm = new SalesForm(userType);
+            salesForm.ShowDialog();
+        }
+
+        private void btnAddFuel_Click_1(object sender, EventArgs e)
+        {
+            if (userType == "User")
+            {
+                MessageBox.Show("تەنها بەڕێوەبەر دەتوانێت وقود زیاد بکات!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            AddFuelForm addForm = new AddFuelForm(0); 
+            addForm.ShowDialog();
+        }
+        private void btnInventory_Click(object sender, EventArgs e)
+        {
+            if (userType == "User")
+            {
+                MessageBox.Show("تەنها بەڕێوەبەر دەتوانێت گەرانەوەی کەل و پەل بکات!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            InventoryForm inventoryForm = new InventoryForm();
+            inventoryForm.ShowDialog();
+        }
+
+        private void btnExit_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
+
+        private void guna2GradientButton2_Click(object sender, EventArgs e)
+        {
+            if (userType != "Admin")
+            {
+                MessageBox.Show("❌ تەنها بەڕێوەبەر دەتوانێت ئەم کردارە ئەنجام بدات!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            forget adminForm = new forget();
+            adminForm.ShowDialog();
+        }
+        private void guna2GradientButton1_Click(object sender, EventArgs e)
+        {
+            if (userType == "User")
+                MessageBox.Show("تەنها بەڕێوەبەر دەتوانێت ڕاپۆرتەکان ببینێت!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            ReportsForm reportsForm = new ReportsForm();
+            reportsForm.ShowDialog();
+        }
+
+        private void guna2GradientButton3_Click(object sender, EventArgs e)
+        {
+            if (userType == "User")
+            {
+                MessageBox.Show("تەنها بەڕێوەبەر دەتوانێت بەکارهێنەران بەڕێوەببات!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            UserManagementForm userManagementForm = new UserManagementForm();
+            userManagementForm.ShowDialog();
+        private bool CheckAdminPermission()
+        {
+            if (userType != "Admin")
+            {
+                MessageBox.Show("تەنها بەڕێوەبەر دەتوانێت ئەم کردارە ئەنجام بدات!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            return true;
+        }
+        private void guna2GradientButton4_Click(object sender, EventArgs e)
+        {
+            if (userType == "User")
+            {
+                MessageBox.Show("تەنها بەڕێوەبەر دەتوانێت ڕاپۆرتەکان ببینێت!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            ViewFeedbackForm reportsForm = new ViewFeedbackForm();
+            reportsForm.ShowDialog();
+        }
+•	Fuel Collection
+
+
+    using (SqlConnection con = new SqlConnection(connectionString))
+    {
+        try
+        {
+            con.Open();
+            string query = @"SELECT 
+                           FuelType as 'جۆری سووتەمەنی', 
+                           Quantity as 'بڕی (لیتر)', 
+                           PricePerLiter as 'نرخی هەر لیترێک',
+                           Supplier as 'دابینکەر',
+                           EntryDate as 'بەرواری چوونە ژوورەوە'
+                           FROM Products";
+
+            SqlDataAdapter adapter = new SqlDataAdapter(query, con);
+            DataTable dt = new DataTable();
+            adapter.Fill(dt);
+
+            dataGridView1.DataSource = dt;
+            FormatDataGridView();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"هەڵە لە بارکردنی داتاکان: {ex.Message}", "هەڵە");
+        }
+private void FormatDataGridView()
+{
+
+private void btnRefresh_Click(object sender, EventArgs e)
+{
+    LoadInventory();
+    MessageBox.Show("داتاکان نوێ کراوەتەوە", "سەرکەوتوو");
+}
+ 
+•	Add new fuel type 
+
+public AddFuelForm(int selectedProductId)
+{
+    InitializeComponent();
+    this.selectedProductId = selectedProductId;
+}
+
+private void AddFuelForm_Load(object sender, EventArgs e)
+{
+    try
+    {
+        بارکردنی_داتاکان();
+        ڕێکخستنی_داتاگرید();
+
+        if (selectedProductId > 0)
+        {
+            بارکردنی_زانیاری_سووتەمەنی();
+            btnAdd.Text = "نوێکردنەوە";
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"هەڵە لە بارکردن: {ex.Message}");
+    }
+}
+
+private void بارکردنی_داتاکان()
+{
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+            string query = "SELECT * FROM Products ORDER BY Id DESC";
+            SqlDataAdapter adapter = new SqlDataAdapter(query, con);
+            DataTable dt = new DataTable();
+            adapter.Fill(dt);
+            dataGridView1.DataSource = dt;
+        }
+    }
+    catch (Exception ex)
+    {
+      //  MessageBox.Show($"هەڵە لە بارکردنی داتاکان: {ex.Message}", "هەڵە");
+    }
+}
+
+private void ڕێکخستنی_داتاگرید()
+{
+    try
+    {
+        if (dataGridView1.Columns.Count > 0)
+        {
+            if (dataGridView1.Columns.Contains("Id"))
+            {
+                dataGridView1.Columns["Id"].HeaderText = "ژمارە";
+                dataGridView1.Columns["Id"].Width = 50;
+            }
+            if (dataGridView1.Columns.Contains("FuelType"))
+            {
+                dataGridView1.Columns["FuelType"].HeaderText = "جۆری سووتەمەنی";
+                dataGridView1.Columns["FuelType"].Width = 150;
+            }
+            if (dataGridView1.Columns.Contains("Quantity"))
+            {
+                dataGridView1.Columns["Quantity"].HeaderText = "بڕ";
+                dataGridView1.Columns["Quantity"].Width = 100;
+                dataGridView1.Columns["Quantity"].DefaultCellStyle.Format = "N0";
+                dataGridView1.Columns["Quantity"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            }
+            if (dataGridView1.Columns.Contains("PricePerLiter"))
+            {
+                dataGridView1.Columns["PricePerLiter"].HeaderText = "نرخ";
+                dataGridView1.Columns["PricePerLiter"].Width = 100;
+                dataGridView1.Columns["PricePerLiter"].DefaultCellStyle.Format = "N0";
+                dataGridView1.Columns["PricePerLiter"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            }
+            if (dataGridView1.Columns.Contains("Supplier"))
+            {
+                dataGridView1.Columns["Supplier"].HeaderText = "دابینکەر";
+                dataGridView1.Columns["Supplier"].Width = 150;
+            }
+            if (dataGridView1.Columns.Contains("EntryDate"))
+            {
+                dataGridView1.Columns["EntryDate"].HeaderText = "بەروار";
+                dataGridView1.Columns["EntryDate"].Width = 120;
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"هەڵە لە ڕێکخستنی داتاگرید: {ex.Message}", "هەڵە");
+    }
+}
+
+private void بارکردنی_زانیاری_سووتەمەنی()
+{
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+            string query = "SELECT * FROM Products WHERE Id = @Id";
+            SqlCommand cmd = new SqlCommand(query, con);
+            cmd.Parameters.AddWithValue("@Id", selectedProductId);
+
+            SqlDataReader reader = cmd.ExecuteReader();
+            if (reader.Read())
+            {
+                banzin.Text = reader["FuelType"].ToString();
+                txtQuantity.Text = reader["Quantity"].ToString();
+                txtPrice.Text = reader["PricePerLiter"].ToString();
+                txtSupplier.Text = reader["Supplier"].ToString();
+                dateEntry.Value = Convert.ToDateTime(reader["EntryDate"]);
+            }
+            reader.Close();
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"هەڵە لە بارکردنی زانیاری: {ex.Message}");
+    }
+}
+
+private void btnAdd_Click_1(object sender, EventArgs e)
+{
+    if (!پشکنینی_بوارەکان()) return;
+
+    using (SqlConnection con = new SqlConnection(connectionString))
+    {
+        try
+        {
+            con.Open();
+
+            if (selectedProductId == 0)
+            {
+                string query = @"INSERT INTO Products (FuelType, Quantity, PricePerLiter, Supplier, EntryDate) 
+                               VALUES (@FuelType, @Quantity, @PricePerLiter, @Supplier, @EntryDate)";
+
+                SqlCommand cmd = new SqlCommand(query, con);
+                cmd.Parameters.AddWithValue("@FuelType", banzin.Text);
+                cmd.Parameters.AddWithValue("@Quantity", decimal.Parse(txtQuantity.Text));
+                cmd.Parameters.AddWithValue("@PricePerLiter", decimal.Parse(txtPrice.Text));
+                cmd.Parameters.AddWithValue("@Supplier", txtSupplier.Text);
+                cmd.Parameters.AddWithValue("@EntryDate", dateEntry.Value);
+
+                int result = cmd.ExecuteNonQuery();
+                if (result > 0)
+                {
+                    MessageBox.Show("سووتەمەنی بە سەرکەوتوویی زیادکرا", "سەرکەوتوو");
+                    بارکردنی_داتاکان();
+                    پاکردنەوەی_بوارەکان();
+                }
+            }
+            else
+            {
+                string query = @"UPDATE Products 
+                               SET FuelType = @FuelType,
+                                   Quantity = @Quantity,
+                                   PricePerLiter = @PricePerLiter,
+                                   Supplier = @Supplier,
+                                   EntryDate = @EntryDate
+                               WHERE Id = @Id";
+
+                SqlCommand cmd = new SqlCommand(query, con);
+                cmd.Parameters.AddWithValue("@Id", selectedProductId);
+                cmd.Parameters.AddWithValue("@FuelType", banzin.Text);
+                cmd.Parameters.AddWithValue("@Quantity", decimal.Parse(txtQuantity.Text));
+                cmd.Parameters.AddWithValue("@PricePerLiter", decimal.Parse(txtPrice.Text));
+                cmd.Parameters.AddWithValue("@Supplier", txtSupplier.Text);
+                cmd.Parameters.AddWithValue("@EntryDate", dateEntry.Value);
+
+                int result = cmd.ExecuteNonQuery();
+                if (result > 0)
+                {
+                    MessageBox.Show("سووتەمەنی بە سەرکەوتوویی نوێکرایەوە", "سەرکەوتوو");
+                    بارکردنی_داتاکان();
+                    پاکردنەوەی_بوارەکان();
+                }
+            }
+        }
+        catch (SqlException sqlEx)
+        {
+            MessageBox.Show($"هەڵەی داتابەیس: {sqlEx.Message}", "هەڵە");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"هەڵە: {ex.Message}", "هەڵە");
+        }
+    }
+}
+
+private void btnEdit_Click(object sender, EventArgs e)
+{
+    if (selectedId == 0)
+    {
+        MessageBox.Show("تکایە ڕیزێک هەڵبژێرە", "ئاگاداری");
+        return;
+    }
+
+    if (!پشکنینی_بوارەکان()) return;
+
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+            string query = @"UPDATE Products 
+                           SET FuelType = @FuelType,
+                               Quantity = @Quantity,
+                               PricePerLiter = @PricePerLiter,
+                               Supplier = @Supplier,
+                               EntryDate = @EntryDate
+                           WHERE Id = @Id";
+
+            SqlCommand cmd = new SqlCommand(query, con);
+            cmd.Parameters.AddWithValue("@Id", selectedId);
+            cmd.Parameters.AddWithValue("@FuelType", banzin.Text);
+            cmd.Parameters.AddWithValue("@Quantity", decimal.Parse(txtQuantity.Text));
+            cmd.Parameters.AddWithValue("@PricePerLiter", decimal.Parse(txtPrice.Text));
+            cmd.Parameters.AddWithValue("@Supplier", txtSupplier.Text);
+            cmd.Parameters.AddWithValue("@EntryDate", dateEntry.Value);
+
+            cmd.ExecuteNonQuery();
+            MessageBox.Show("سووتەمەنی بە سەرکەوتوویی نوێکرایەوە", "سەرکەوتوو");
+            بارکردنی_داتاکان();
+            پاکردنەوەی_بوارەکان();
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"هەڵە لە نوێکردنەوە: {ex.Message}", "هەڵە");
+
+private void پاکردنەوەی_بوارەکان()
+{
+    selectedId = 0;
+    selectedProductId = 0;
+    banzin.Clear();
+    txtQuantity.Clear();
+    txtPrice.Clear();
+    txtSupplier.Clear();
+    dateEntry.Value = DateTime.Now;
+    btnAdd.Text = "زیادکردن";
+    banzin.Focus();
+}
+
+private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
+{
+    if (e.RowIndex >= 0)
+    {
+        try
+        {
+            DataGridViewRow row = dataGridView1.Rows[e.RowIndex];
+
+            selectedId = Convert.ToInt32(row.Cells[0].Value);
+            selectedProductId = selectedId;
+            banzin.Text = row.Cells[1].Value?.ToString() ?? "";
+            txtQuantity.Text = row.Cells[2].Value?.ToString() ?? "0";
+            txtPrice.Text = row.Cells[3].Value?.ToString() ?? "0";
+            txtSupplier.Text = row.Cells[4].Value?.ToString() ?? "";
+
+            if (row.Cells[5].Value != null)
+                dateEntry.Value = Convert.ToDateTime(row.Cells[5].Value);
+
+            btnAdd.Text = "نوێکردنەوە";
+            banzin.Focus();
+            banzin.SelectAll();
+        }
+        catch (Exception ex)
+        {
+         //   MessageBox.Show($"هەڵە لە بارکردنی داتا: {ex.Message}");
+        }
+    }
+}
+
+private void dataGridView1_CellEnter(object sender, DataGridViewCellEventArgs e)
+{
+
+    if (e.RowIndex >= 0)
+    {
+        try
+        {
+            DataGridViewRow row = dataGridView1.Rows[e.RowIndex];
+
+            if (dataGridView1.Columns.Count > 0)
+            {
+                if (dataGridView1.Columns.Contains("Id") && row.Cells["Id"].Value != null)
+                    selectedId = Convert.ToInt32(row.Cells["Id"].Value);
+                else
+                    selectedId = 0;
+
+                selectedProductId = selectedId;
+
+                if (dataGridView1.Columns.Contains("FuelType") && row.Cells["FuelType"].Value != null)
+                    banzin.Text = row.Cells["FuelType"].Value.ToString();
+                else
+                    banzin.Text = "";
+
+                if (dataGridView1.Columns.Contains("Quantity") && row.Cells["Quantity"].Value != null)
+                    txtQuantity.Text = row.Cells["Quantity"].Value.ToString();
+                else
+                    txtQuantity.Text = "0";
+
+                if (dataGridView1.Columns.Contains("PricePerLiter") && row.Cells["PricePerLiter"].Value != null)
+                    txtPrice.Text = row.Cells["PricePerLiter"].Value.ToString();
+                else
+                    txtPrice.Text = "0";
+
+                if (dataGridView1.Columns.Contains("Supplier") && row.Cells["Supplier"].Value != null)
+                    txtSupplier.Text = row.Cells["Supplier"].Value.ToString();
+                else
+                    txtSupplier.Text = "";
+
+                if (dataGridView1.Columns.Contains("EntryDate") && row.Cells["EntryDate"].Value != null)
+                    dateEntry.Value = Convert.ToDateTime(row.Cells["EntryDate"].Value);
+
+                btnAdd.Text = "نوێکردنەوە";
+            }
+        }
+        catch (Exception ex)
+        {
+        //    MessageBox.Show($"هەڵە لە بارکردنی داتا: {ex.Message}");
+        }
+    }
+private void dataGridView1_SelectionChanged_1(object sender, EventArgs e)
+{
+    if (dataGridView1.SelectedRows.Count > 0)
+    {
+        DataGridViewRow row = dataGridView1.SelectedRows[0];
+        selectedId = Convert.ToInt32(row.Cells["Id"].Value);
+        selectedProductId = selectedId;
+        banzin.Text = row.Cells["FuelType"].Value.ToString();
+        txtQuantity.Text = row.Cells["Quantity"].Value.ToString();
+        txtPrice.Text = row.Cells["PricePerLiter"].Value.ToString();
+        txtSupplier.Text = row.Cells["Supplier"].Value.ToString();
+        dateEntry.Value = Convert.ToDateTime(row.Cells["EntryDate"].Value);
+        btnAdd.Text = "نوێکردنەوە";
+    }
+
+•	 Card Payment
+
+    public partial class CardPaymentForm : Form
+    {
+        public CardPaymentForm()
+        {
+            InitializeComponent();
+        }
+        private void CardPaymentForm_Load(object sender, EventArgs e)
+        {
+            
+            string fakeBarcode = $"CARD-{DateTime.Now:HHmmss}";
+            lblBarcode.Text = $"بارکۆد: {fakeBarcode}";
+        }
+
+        private void btnScan_Click(object sender, EventArgs e)
+        {
+            
+            btnScan.Enabled = false;
+            btnManual.Enabled = false;
+
+            
+            lblStatus.Text = "⏳ سکانکردن لە پێشکەوتندایە...";
+            lblStatus.ForeColor = Color.Blue;
+            timer.Start();
+
+        private void timer_Tick(object sender, EventArgs e)
+        {
+            timer.Stop();
+            lblStatus.Text = "✅ سکانکردن سەرکەوتوو بوو";
+            lblStatus.ForeColor = Color.Green;
+
+            
+            MessageBox.Show("کارتەکە بە سەرکەوتوویی سکان کرا.!", "سەرکەوتن",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            
+            this.DialogResult = DialogResult.OK;
+            this.Close();
+
+        private void btnManual_Click(object sender, EventArgs e)
+        
+            lblStatus.Text = "✅ پارەدان پشتڕاستکرایەوە";
+            lblStatus.ForeColor = Color.Green;
+            MessageBox.Show("پارەدان بە دەستی پشتڕاستکرایەوە!", "تەواو بوو",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            
+            this.DialogResult = DialogResult.OK;
+            this.Close();
+•	Gmail 
+
+public support()
+ {
+     InitializeComponent();
+ }
+
+ private void gunaCirclePictureBox1_Click(object sender, EventArgs e)
+ {
+
+ }
+
+ private void gunaCirclePictureBox2_Click(object sender, EventArgs e)
+ {
+     System.Diagnostics.Process.Start("https://mail.google.com/mail/?view=cm&fs=1&to=email@example.com&su=دەربارەی سیستەم&body=سڵاو");
+
+System.Diagnostics.Process.Start("https://mail.google.com/mail/?view=cm&tf=0&to=email@example.com");
+ }
+
+ private void support_Load(object sender, EventArgs e)
+ {
+
+ }
+
+ private void pictureBox2_Click(object sender, EventArgs e)
+ {
+     System.Diagnostics.Process.Start("https://mail.google.com/mail/?view=cm&fs=1&to=email@example.com&su=دەربارەی سیستەم&body=سڵاو");
+
+System.Diagnostics.Process.Start("https://mail.google.com/mail/?view=cm&tf=0&to=email@example.com");
+ }
+ 
+•	Raport Sales 
+
+        public ReportsForm()
+        {
+            InitializeComponent();
+            LoadSalesReport();
+            SetupBeautifulDesign();
+        }
+
+        private void SetupBeautifulDesign()
+        {
+            this.BackColor = Color.FromArgb(250, 250, 250);
+
+            dataGridView1.BackgroundColor = Color.White;
+            dataGridView1.BorderStyle = BorderStyle.None;
+            dataGridView1.EnableHeadersVisualStyles = false;
+            dataGridView1.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(255, 193, 7);
+            dataGridView1.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dataGridView1.ColumnHeadersDefaultCellStyle.Font = new Font("Arial", 10, FontStyle.Bold);
+            dataGridView1.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(255, 248, 225);
+        }
+
+        private void LoadSalesReport()
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+
+                    string query = @"
+                    SELECT 
+                        Id as 'ژمارە',
+                        FuelType as 'جۆری سووتەمەنی',
+                        Quantity as 'بڕی (لیتر)',
+                        PricePerLiter as 'نرخی هەر لیترێک',
+                        TotalAmount as 'کۆی گشتی',
+                        CustomerName as 'ناوی کڕیار',
+                        VehicleNumber as 'ژمارەی سەیارە',
+                        SaleDate as 'بەرواری فرۆشتن'
+                    FROM Sales 
+                    ORDER BY SaleDate DESC";
+
+                    SqlDataAdapter adapter = new SqlDataAdapter(query, con);
+                    DataTable dt = new DataTable();
+                    adapter.Fill(dt);
+
+                    dataGridView1.DataSource = dt;
+                    CalculateTotals(dt);
+                    UpdateSummaryCards(dt);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"هەڵە لە بارکردنی ڕاپۆرتەکەدا: {ex.Message}");
+                LoadSampleData();
+            }
+        }
+
+        private void CalculateTotals(DataTable dt)
+        {
+            decimal totalRevenue = 0;
+            decimal totalQuantity = 0;
+            int totalTransactions = dt.Rows.Count;
+
+            foreach (DataRow row in dt.Rows)
+            {
+                if (row["کۆی گشتی"] != DBNull.Value)
+                {
+                    string totalAmountStr = row["کۆی گشتی"].ToString();
+                    if (decimal.TryParse(totalAmountStr, out decimal totalAmount))
+                    {
+                        totalRevenue += totalAmount;
+                    }
+                }
+
+                if (row["بڕی (لیتر)"] != DBNull.Value)
+                {
+                    totalQuantity += Convert.ToDecimal(row["بڕی (لیتر)"]);
+                }
+            }
+
+            lblTotalRevenue.Text = $"{totalRevenue:N0} دينار";
+            lblTotalQuantity.Text = $"{totalQuantity:N0} لیتر";
+            lblTotalSales.Text = totalTransactions.ToString();
+        }
+
+        private void UpdateSummaryCards(DataTable dt)
+        {
+            if (dt.Rows.Count == 0) return;
+
+            var fuelStats = dt.AsEnumerable()
+                .GroupBy(row => row["جۆری سووتەمەنی"].ToString())
+                .Select(g => new
+                {
+                    FuelType = g.Key,
+                    TotalQuantity = g.Sum(row =>
+                        row["بڕی (لیتر)"] != DBNull.Value ? Convert.ToDecimal(row["بڕی (لیتر)"]) : 0),
+                    TotalRevenue = g.Sum(row =>
+                    {
+                        if (row["کۆی گشتی"] != DBNull.Value)
+                        {
+                            string totalAmountStr = row["کۆی گشتی"].ToString();
+                            return decimal.TryParse(totalAmountStr, out decimal totalAmount) ? totalAmount : 0;
+                        }
+                        return 0;
+                    })
+                })
+                .OrderByDescending(x => x.TotalRevenue)
+                .ToList();
+
+            panelFuelStats.Controls.Clear();
+
+            int yPos = 10;
+            foreach (var stat in fuelStats)
+            {
+                var fuelPanel = CreateFuelStatPanel(stat.FuelType, stat.TotalQuantity, stat.TotalRevenue, yPos);
+                panelFuelStats.Controls.Add(fuelPanel);
+                yPos += 70;
+            }
+        }
+
+        private Panel CreateFuelStatPanel(string fuelType, decimal quantity, decimal revenue, int yPos)
+        {
+            Panel panel = new Panel();
+            panel.Size = new Size(280, 60);
+            panel.Location = new Point(10, yPos);
+            panel.BackColor = GetFuelColor(fuelType);
+            panel.BorderStyle = BorderStyle.FixedSingle;
+
+            Label lblType = new Label();
+            lblType.Text = fuelType;
+            lblType.Font = new Font("Arial", 10, FontStyle.Bold);
+            lblType.ForeColor = Color.White;
+            lblType.Location = new Point(10, 5);
+            lblType.Size = new Size(150, 20);
+
+            Label lblQty = new Label();
+            lblQty.Text = $"{quantity:N0} لتر";
+            lblQty.Font = new Font("Arial", 9);
+            lblQty.ForeColor = Color.White;
+            lblQty.Location = new Point(10, 25);
+            lblQty.Size = new Size(120, 15);
+
+            Label lblRev = new Label();
+            lblRev.Text = $"{revenue:N0} دينار";
+            lblRev.Font = new Font("Arial", 9, FontStyle.Bold);
+            lblRev.ForeColor = Color.White;
+            lblRev.Location = new Point(10, 40);
+            lblRev.Size = new Size(120, 15);
+
+            panel.Controls.Add(lblType);
+            panel.Controls.Add(lblQty);
+            panel.Controls.Add(lblRev);
+
+            return panel;
+        }
+
+        private Color GetFuelColor(string fuelType)
+        {
+            switch (fuelType.ToLower())
+            {
+                case string s when s.Contains("بنزين 91"):
+                    return Color.FromArgb(255, 193, 7);
+                case string s when s.Contains("بنزين 95"):
+                    return Color.FromArgb(255, 87, 34);
+                case string s when s.Contains("ديزل"):
+                    return Color.FromArgb(33, 150, 243);
+                default:
+                    return Color.FromArgb(156, 39, 176);
+            }
+        }
+
+        private void LoadSampleData()
+        {
+            DataTable dt = new DataTable();
+            dt.Columns.Add("جۆری سووتەمەنی");
+            dt.Columns.Add("بڕی (لیتر)", typeof(decimal));
+            dt.Columns.Add("نرخی هەر لیترێک", typeof(decimal));
+            dt.Columns.Add("کۆی گشتی", typeof(decimal));
+            dt.Columns.Add("ناوی کڕیار");
+            dt.Columns.Add("ژمارەی سەیارە");
+            dt.Columns.Add("بەرواری فرۆشتن", typeof(DateTime));
+
+           
+
+            dataGridView1.DataSource = dt;
+            CalculateTotals(dt);
+            UpdateSummaryCards(dt);
+        }
+
+        private void btnFilter_Click_1(object sender, EventArgs e)
+        {
+            FilterReports();
+        }
+
+        private void FilterReports()
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+
+                    string query = @"
+                    SELECT 
+                        Id as 'ژمارە',
+                        FuelType as 'جۆری سووتەمەنی',
+                        Quantity as 'بڕی (لیتر)',
+                        PricePerLiter as 'نرخی هەر لیترێک',
+                        TotalAmount as 'کۆی گشتی',
+                        CustomerName as 'ناوی کڕیار',
+                        VehicleNumber as 'ژمارەی سەیارە',
+                        SaleDate as 'بەرواری فرۆشتن'
+                    FROM Sales 
+                    WHERE SaleDate BETWEEN @from AND @to
+                    ORDER BY SaleDate DESC";
+
+                    SqlCommand cmd = new SqlCommand(query, con);
+                    cmd.Parameters.AddWithValue("@from", dateFrom.Value);
+                    cmd.Parameters.AddWithValue("@to", dateTo.Value.AddDays(1));
+
+                    SqlDataAdapter adapter = new SqlDataAdapter(cmd);
+                    DataTable dt = new DataTable();
+                    adapter.Fill(dt);
+
+                    dataGridView1.DataSource = dt;
+                    CalculateTotals(dt);
+                    UpdateSummaryCards(dt);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"هەڵەی فلتەرکردن: {ex.Message}");
+            }
+        }
+
+        private void btnPrint_Click_1(object sender, EventArgs e)
+        {
+            PrintReport();
+        }
+
+        private void PrintReport()
+        {
+            try
+            {
+                PrintDocument printDoc = new PrintDocument();
+                printDoc.PrintPage += new PrintPageEventHandler(PrintReportPage);
+
+                PrintPreviewDialog previewDialog = new PrintPreviewDialog();
+                previewDialog.Document = printDoc;
+                previewDialog.Text = "پێشبینینی ڕاپۆرت";
+                previewDialog.WindowState = FormWindowState.Maximized;
+
+                PageSetupDialog pageSetup = new PageSetupDialog();
+                pageSetup.Document = printDoc;
+
+                previewDialog.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"هەڵە لە چاپکردنی ڕاپۆرت: {ex.Message}");
+            }
+        }
+
+        private void PrintReportPage(object sender, PrintPageEventArgs e)
+        {
+            Graphics graphics = e.Graphics;
+            Font titleFont = new Font("Arial", 18, FontStyle.Bold);
+            Font headerFont = new Font("Arial", 12, FontStyle.Bold);
+            Font normalFont = new Font("Arial", 10);
+            Font smallFont = new Font("Arial", 9);
+
+            float yPos = 50;
+            float leftMargin = e.MarginBounds.Left;
+            float rightMargin = e.MarginBounds.Right;
+            float width = e.MarginBounds.Width;
+
+            string title = "ڕاپۆرتی فرۆشتن - سیستمێکی بەڕێوەبردنی سووتەمەنی";
+            SizeF titleSize = graphics.MeasureString(title, titleFont);
+            graphics.DrawString(title, titleFont, Brushes.Navy,
+                (width - titleSize.Width) / 2, yPos);
+            yPos += titleSize.Height + 20;
+
+            string reportDate = $"بەرواری ڕاپۆرت: {DateTime.Now:yyyy/MM/dd HH:mm}";
+            graphics.DrawString(reportDate, headerFont, Brushes.Black, leftMargin, yPos);
+            yPos += 30;
+
+            string stats = $"کۆی فرۆشتن: {lblTotalSales.Text} | کۆی بڕ: {lblTotalQuantity.Text} | کۆی داھات: {lblTotalRevenue.Text}";
+            graphics.DrawString(stats, headerFont, Brushes.DarkGreen, leftMargin, yPos);
+            yPos += 40;
+
+            graphics.DrawLine(new Pen(Color.Black, 2), leftMargin, yPos, rightMargin, yPos);
+            yPos += 20;
+
+            float[] columnWidths = { 60, 120, 80, 80, 100, 120, 100, 100 };
+            string[] headers = { "ژمارە", "جۆری سووتەمەنی", "بڕی", "نرخ", "کۆی گشتی", "کڕیار", "سەیارە", "بەروار" };
+
+            float xPos = leftMargin;
+            for (int i = 0; i < headers.Length; i++)
+            {
+                graphics.DrawString(headers[i], headerFont, Brushes.White,
+                    new RectangleF(xPos, yPos, columnWidths[i], 30));
+                graphics.FillRectangle(Brushes.DarkBlue,
+                    xPos, yPos, columnWidths[i], 30);
+                xPos += columnWidths[i];
+            }
+            yPos += 35;
+
+            DataTable data = (DataTable)dataGridView1.DataSource;
+            if (data != null && data.Rows.Count > 0)
+            {
+                for (int i = 0; i < data.Rows.Count; i++)
+                {
+                    if (yPos > e.MarginBounds.Height - 100)
+                    {
+                        e.HasMorePages = true;
+                        return;
+                    }
+
+                    DataRow row = data.Rows[i];
+                    xPos = leftMargin;
+
+                    string[] rowData = {
+                        (i + 1).ToString(),
+                        row["جۆری سووتەمەنی"].ToString(),
+                        row["بڕی (لیتر)"].ToString(),
+                        row["نرخی هەر لیترێک"].ToString() + " د.",
+                        row["کۆی گشتی"].ToString() + " د.",
+                        row["ناوی کڕیار"].ToString(),
+                        row["ژمارەی سەیارە"].ToString(),
+                        Convert.ToDateTime(row["بەرواری فرۆشتن"]).ToString("yyyy/MM/dd")
+                    };
+
+                    for (int j = 0; j < rowData.Length; j++)
+                    {
+                        Color bgColor = i % 2 == 0 ? Color.White : Color.FromArgb(240, 240, 240);
+                        graphics.FillRectangle(new SolidBrush(bgColor),
+                            xPos, yPos, columnWidths[j], 25);
+                        graphics.DrawRectangle(Pens.LightGray, xPos, yPos, columnWidths[j], 25);
+
+                        graphics.DrawString(rowData[j], normalFont, Brushes.Black,
+                            new RectangleF(xPos + 2, yPos + 2, columnWidths[j] - 4, 21));
+
+                        xPos += columnWidths[j];
+                    }
+                    yPos += 27;
+                }
+            }
+            else
+            {
+                graphics.DrawString("هیچ داتایەک بۆ نیشاندان نیە", headerFont, Brushes.Red, leftMargin, yPos);
+                yPos += 30;
+            }
+
+            yPos += 20;
+
+            graphics.DrawLine(new Pen(Color.Black, 1), leftMargin, yPos, leftMargin + 200, yPos);
+            yPos += 20;
+            graphics.DrawString("واژۆی بەڕێوەبەر", headerFont, Brushes.Black, leftMargin, yPos);
+
+            string pageNum = $"پەڕەی 1";
+            graphics.DrawString(pageNum, normalFont, Brushes.Black, rightMargin - 50, e.MarginBounds.Bottom - 30);
+
+            e.HasMorePages = false;
+        }
+
+        private void btnExport_Click_1(object sender, EventArgs e)
+        {
+            SaveFileDialog saveDialog = new SaveFileDialog();
+            saveDialog.Filter = "فایل Excel|*.xlsx|فایل PDF|*.pdf";
+            saveDialog.Title = "ڕاپۆرتەکە سەیڤ بکە";
+
+            if (saveDialog.ShowDialog() == DialogResult.OK)
+            {
+                MessageBox.Show($"ڕاپۆرتەکە لە...: {saveDialog.FileName}", "هەڵگرتن", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void btnRefresh_Click(object sender, EventArgs e)
+        {
+            LoadSalesReport();
+            MessageBox.Show("داتا نوێکراوەتەوە", "نوێکردنەوە", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void btnFixDatabase_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+
+                    string fixQuery = @"
+                    ALTER TABLE Sales 
+                    ALTER COLUMN TotalAmount DECIMAL(10,2)";
+
+                    SqlCommand cmd = new SqlCommand(fixQuery, con);
+                    cmd.ExecuteNonQuery();
+
+                    MessageBox.Show("✅ داتابەیسەکە بە سەرکەوتوویی چاک کراوەتەوە.!\nئێستا TotalAmount ژمارەیە نەک دەق..");
+                    LoadSalesReport();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"❌هەڵەی چاککردنەوەی بنکەدراوە: {ex.Message}");
+            }
+        }
+
+        private void ReportsForm_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void btnQuickPrint_Click(object sender, EventArgs e)
+        {
+            PrintDocument printDoc = new PrintDocument();
+            printDoc.PrintPage += new PrintPageEventHandler(PrintReportPage);
+
+            PrintDialog printDialog = new PrintDialog();
+            printDialog.Document = printDoc;
+
+            if (printDialog.ShowDialog() == DialogResult.OK)
+            {
+                printDoc.Print();
+                MessageBox.Show("ڕاپۆرتەکە بە سەرکەوتوویی چاپ کرا!", "سەرکەوتوو",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void PrintSingleInvoice(int saleId)
+        {
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+
+                    string query = @"
+                    SELECT Id, FuelType, Quantity, PricePerLiter, TotalAmount, 
+                           CustomerName, VehicleNumber, SaleDate 
+                    FROM Sales WHERE Id = @SaleId";
+
+                    SqlCommand cmd = new SqlCommand(query, con);
+                    cmd.Parameters.AddWithValue("@SaleId", saleId);
+
+                    SqlDataReader reader = cmd.ExecuteReader();
+
+                    if (reader.Read())
+                    {
+                        PrintDocument invoiceDoc = new PrintDocument();
+                        invoiceDoc.PrintPage += (s, e) => PrintInvoicePage(s, e, reader);
+
+                        PrintPreviewDialog preview = new PrintPreviewDialog();
+                        preview.Document = invoiceDoc;
+                        preview.Text = "پێشبینینی فاتورە";
+                        preview.ShowDialog();
+                    }
+                    reader.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"هەڵە لە چاپکردنی فاتورە: {ex.Message}");
+            }
+        }
+
+        private void PrintInvoicePage(object sender, PrintPageEventArgs e, SqlDataReader reader)
+        {
+            Graphics g = e.Graphics;
+            Font titleFont = new Font("Arial", 20, FontStyle.Bold);
+            Font headerFont = new Font("Arial", 14, FontStyle.Bold);
+            Font normalFont = new Font("Arial", 12);
+
+            float yPos = 50;
+            float center = e.MarginBounds.Width / 2;
+
+            string title = "فاتورەی فرۆشتن";
+            g.DrawString(title, titleFont, Brushes.DarkBlue, center - 100, yPos);
+            yPos += 40;
+
+            g.DrawString("شوێنی وێستگەی سووتەمەنی", headerFont, Brushes.Black, center - 120, yPos);
+            yPos += 25;
+            g.DrawString("تەلەفۆن: ٠٧٧٠ ١٢٣ ٤٥٦٧", normalFont, Brushes.Black, center - 80, yPos);
+            yPos += 40;
+
+            g.DrawLine(Pens.Black, 50, yPos, e.MarginBounds.Width - 50, yPos);
+            yPos += 20;
+
+            string fuelType = reader["FuelType"].ToString();
+            decimal quantity = Convert.ToDecimal(reader["Quantity"]);
+            decimal price = Convert.ToDecimal(reader["PricePerLiter"]);
+            decimal total = Convert.ToDecimal(reader["TotalAmount"]);
+            string customer = reader["CustomerName"].ToString();
+            string vehicle = reader["VehicleNumber"].ToString();
+            DateTime saleDate = Convert.ToDateTime(reader["SaleDate"]);
+
+            g.DrawString("ناوی کڕیار:", headerFont, Brushes.Black, 80, yPos);
+            g.DrawString(customer, normalFont, Brushes.Black, 300, yPos);
+            yPos += 35;
+
+            g.DrawString("ژمارەی سەیارە:", headerFont, Brushes.Black, 80, yPos);
+            g.DrawString(vehicle, normalFont, Brushes.Black, 300, yPos);
+            yPos += 35;
+
+            g.DrawString("جۆری سووتەمەنی:", headerFont, Brushes.Black, 80, yPos);
+            g.DrawString(fuelType, normalFont, Brushes.Black, 300, yPos);
+            yPos += 35;
+
+            g.DrawString("بڕ (لیتر):", headerFont, Brushes.Black, 80, yPos);
+            g.DrawString(quantity.ToString("N2"), normalFont, Brushes.Black, 300, yPos);
+            yPos += 35;
+
+            g.DrawString("نرخ:", headerFont, Brushes.Black, 80, yPos);
+            g.DrawString(price.ToString("N2") + " دینار", normalFont, Brushes.Black, 300, yPos);
+            yPos += 35;
+
+            g.DrawString("کۆی گشتی:", headerFont, Brushes.Black, 80, yPos);
+            g.DrawString(total.ToString("N2") + " دینار", normalFont, Brushes.Black, 300, yPos);
+            yPos += 35;
+
+            g.DrawString("بەروار:", headerFont, Brushes.Black, 80, yPos);
+            g.DrawString(saleDate.ToString("yyyy/MM/dd HH:mm"), normalFont, Brushes.Black, 300, yPos);
+            yPos += 35;
+
+            g.DrawString("ژمارەی فاتورە:", headerFont, Brushes.Black, 80, yPos);
+            g.DrawString(reader["Id"].ToString(), normalFont, Brushes.Black, 300, yPos);
+            yPos += 50;
+
+            g.DrawString("سوپاس بۆ داواکاریەکەت! ✨", headerFont, Brushes.DarkGreen, center - 120, yPos);
+            yPos += 40;
+            g.DrawString("واژۆ", headerFont, Brushes.Black, center - 30, yPos);
+            yPos += 20;
+            g.DrawLine(Pens.Black, center - 50, yPos, center + 50, yPos);
+        }
+
+        private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex >= 0)
+            {
+                int saleId = Convert.ToInt32(dataGridView1.Rows[e.RowIndex].Cells["ژمارە"].Value);
+                PrintSingleInvoice(saleId);
+            }
+        }
+    }
+}
+ 
+•	User mangment 
+
+public UserManagementForm()
+{
+    InitializeComponent();
+    SetupBeautifulDesign();
+    LoadAllUsers();
+}
+
+private void SetupBeautifulDesign()
+{
+    this.BackColor = Color.FromArgb(250, 250, 250);
+    this.Text = "بەڕێوەبردنی بەکارهێنەران";
+
+    dataGridViewUsers.BackgroundColor = Color.White;
+    dataGridViewUsers.BorderStyle = BorderStyle.None;
+    dataGridViewUsers.EnableHeadersVisualStyles = false;
+    dataGridViewUsers.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(0, 123, 255);
+    dataGridViewUsers.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+    dataGridViewUsers.ColumnHeadersDefaultCellStyle.Font = new Font("Arial", 10, FontStyle.Bold);
+    dataGridViewUsers.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(240, 248, 255);
+}
+
+private void LoadAllUsers()
+{
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+
+            bool usersTableExists = CheckTableExists(con, "Users");
+
+            if (!usersTableExists)
+            {
+                MessageBox.Show("هیچ خشتەی بەکارهێنەرێک نەدۆزرایەوە!\nتکایە خشتەکان دروست بکە.", "زانیاری", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            string query = @"
+            SELECT 
+                Username as 'ناوی بەکارهێنەر',
+                Password as 'وشەی نهێنی'
+            FROM Users
+            ORDER BY Username";
+
+            SqlDataAdapter adapter = new SqlDataAdapter(query, con);
+            DataTable dt = new DataTable();
+            adapter.Fill(dt);
+
+            dataGridViewUsers.DataSource = dt;
+            UpdateStatistics(dt);
+            ApplyRowColors();
+
+            if (dt.Rows.Count == 0)
+            {
+                MessageBox.Show("هیچ بەکارهێنەرێک نەدۆزرایەوە!", "زانیاری", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"هەڵە لە بارکردنی داتا: {ex.Message}", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+
+private bool CheckTableExists(SqlConnection connection, string tableName)
+{
+    try
+    {
+        SqlCommand cmd = new SqlCommand(
+            $"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{tableName}'",
+            connection);
+        int count = (int)cmd.ExecuteScalar();
+        return count > 0;
+    }
+    catch
+    {
+        return false;
+    }
+}
+
+private void UpdateStatistics(DataTable dt)
+{
+    int totalUsers = dt.Rows.Count;
+
+    lblTotalUsers.Text = $"کۆی گشتی: {totalUsers}";
+    lblAdminsCount.Text = $"بەڕێوەبەر: 0";
+    lblUsersCount.Text = $"کارمەند: {totalUsers}";
+}
+
+private void ApplyRowColors()
+{
+    foreach (DataGridViewRow row in dataGridViewUsers.Rows)
+    {
+        row.DefaultCellStyle.BackColor = Color.FromArgb(225, 245, 254);
+        row.DefaultCellStyle.ForeColor = Color.FromArgb(1, 87, 155);
+    }
+}
+
+private void btnRefresh_Click_1(object sender, EventArgs e)
+{
+    LoadAllUsers();
+}
+
+private void btnExport_Click_1(object sender, EventArgs e)
+{
+    try
+    {
+        SaveFileDialog saveDialog = new SaveFileDialog();
+        saveDialog.Filter = "فایل Excel|*.xlsx|فایل CSV|*.csv";
+        saveDialog.Title = "هەڵگرتنی داتای بەکارهێنەران";
+
+        if (saveDialog.ShowDialog() == DialogResult.OK)
+        {
+            MessageBox.Show($"داتا هەڵگیرا لە: {saveDialog.FileName}", "هەڵگرتن", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"هەڵە لە هەڵگرتنی داتا: {ex.Message}", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+
+private void btnAddUser_Click_1(object sender, EventArgs e)
+{
+    MessageBox.Show("ئەم ئیختیارە لە کاردا نیە!", "زانیاری", MessageBoxButtons.OK, MessageBoxIcon.Information);
+}
+
+private void dataGridViewUsers_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+{
+    if (e.RowIndex >= 0 && e.RowIndex < dataGridViewUsers.Rows.Count)
+    {
+        DataGridViewRow row = dataGridViewUsers.Rows[e.RowIndex];
+        string username = row.Cells["ناوی بەکارهێنەر"].Value?.ToString() ?? "";
+
+        string message = $"زانیاری بەکارهێنەر:\n\n" +
+                       $"ناو: {username}\n" +
+                       $"وشەی نهێنی: {row.Cells["وشەی نهێنی"].Value}";
+
+        MessageBox.Show(message, "زانیاری بەکارهێنەر", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+}
+
+private void txtSearch_TextChanged(object sender, EventArgs e)
+{
+    SearchUsers(txtSearch.Text);
+}
+
+private void SearchUsers(string searchText)
+{
+    if (dataGridViewUsers.DataSource is DataTable dt)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            dt.DefaultView.RowFilter = "";
+        }
+        else
+        {
+            string filter = $"[ناوی بەکارهێنەر] LIKE '%{searchText}%'";
+            dt.DefaultView.RowFilter = filter;
+        }
+        UpdateStatistics(dt);
+    }
+}
+
+private void btnDeleteUser_Click_1(object sender, EventArgs e)
+{
+    if (dataGridViewUsers.CurrentRow != null && dataGridViewUsers.CurrentRow.Index >= 0)
+    {
+        DataGridViewRow row = dataGridViewUsers.CurrentRow;
+        string username = row.Cells["ناوی بەکارهێنەر"].Value?.ToString() ?? "";
+
+        if (string.IsNullOrEmpty(username))
+        {
+            MessageBox.Show("تکایە بەکارهێنەرێکی دروست هەڵبژێرە!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        DialogResult result = MessageBox.Show(
+            $"دڵنیای لە سڕینەوەی بەکارهێنەر '{username}'?",
+            "سڕینەوەی بەکارهێنەر",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (result == DialogResult.Yes)
+        {
+            if (DeleteUser(username))
+            {
+                MessageBox.Show("بەکارهێنەر سڕدرایەوە!", "سەرکەوتوو", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                LoadAllUsers();
+            }
+        }
+    }
+    else
+    {
+        MessageBox.Show("تکایە بەکارهێنەرێک هەڵبژێرە!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+    }
+}
+
+private bool DeleteUser(string username)
+{
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+
+            if (!CheckTableExists(con, "Users"))
+            {
+                MessageBox.Show("خشتەی کارمەندان بوونی نیە!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            string query = "DELETE FROM Users WHERE Username = @username";
+            SqlCommand cmd = new SqlCommand(query, con);
+            cmd.Parameters.AddWithValue("@username", username);
+            return cmd.ExecuteNonQuery() > 0;
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"هەڵە لە سڕینەوەی بەکارهێنەر: {ex.Message}", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        return false;
+    }
+}
+
+private void btnResetPassword_Click_1(object sender, EventArgs e)
+{
+    if (dataGridViewUsers.CurrentRow != null && dataGridViewUsers.CurrentRow.Index >= 0)
+    {
+        DataGridViewRow row = dataGridViewUsers.CurrentRow;
+        string username = row.Cells["ناوی بەکارهێنەر"].Value?.ToString() ?? "";
+
+        if (string.IsNullOrEmpty(username))
+        {
+            MessageBox.Show("تکایە بەکارهێنەرێکی دروست هەڵبژێرە!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        string newPassword = "123123";
+
+        if (ResetUserPassword(username, newPassword))
+        {
+            MessageBox.Show($"وشەی نهێنی بۆ '{username}' ڕێکخرایەوە بۆ: {newPassword}", "سەرکەوتوو", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            LoadAllUsers();
+        }
+    }
+    else
+    {
+        MessageBox.Show("تکایە بەکارهێنەرێک هەڵبژێرە!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+    }
+}
+
+private bool ResetUserPassword(string username, string newPassword)
+{
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+
+            if (!CheckTableExists(con, "Users"))
+            {
+                MessageBox.Show("خشتەی کارمەندان بوونی نیە!", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            string query = "UPDATE Users SET Password = @password WHERE Username = @username";
+            SqlCommand cmd = new SqlCommand(query, con);
+            cmd.Parameters.AddWithValue("@password", newPassword);
+            cmd.Parameters.AddWithValue("@username", username);
+            return cmd.ExecuteNonQuery() > 0;
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"هەڵە لە ڕێکخستنی وشەی نهێنی: {ex.Message}", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        return false;
+    }
+}
+
+private void btnCheckTables_Click_1(object sender, EventArgs e)
+{
+    CheckDatabaseTables();
+}
+
+private void CheckDatabaseTables()
+{
+    try
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+
+            string query = @"
+            SELECT 
+                name as 'ناوی خشتە',
+                CASE 
+                    WHEN name = 'Users' THEN (SELECT COUNT(*) FROM Users)
+                    ELSE 0
+                END as 'ژمارەی بەکارهێنەران'
+            FROM sys.tables 
+            WHERE name = 'Users'
+            ORDER BY name";
+
+            SqlCommand cmd = new SqlCommand(query, con);
+            SqlDataReader dr = cmd.ExecuteReader();
+
+            string status = "خشتەکانی بنکەی دراوە:\n\n";
+            bool hasTables = false;
+
+            while (dr.Read())
+            {
+                status += $"• {dr["ناوی خشتە"]} - {dr["ژمارەی بەکارهێنەران"]} بەکارهێنەر\n";
+                hasTables = true;
+            }
+            dr.Close();
+
+            if (!hasTables)
+            {
+                status += "❌ هیچ خشتەیەک نەدۆزرایەوە!";
+            }
+
+            MessageBox.Show(status, "ڕێگای خشتەکان", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"هەڵە لە پشکنینی خشتەکان: {ex.Message}", "هەڵە", MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+
+private void btnCreateTables_Click(object sender, EventArgs e)
+{
+    CreateDatabaseTables();
+}
+
+private void CreateDatabaseTables()
+{
+            
+}
+
+private void UserManagementForm_Load(object sender, EventArgs e)
+{
+    //this.usersTableAdapter.Fill(this.fuelDataSet1.Users);
+}
+
+private void lblSearch_Click(object sender, EventArgs e)
+{
+
+}
+ 
+•	View feedback
+
+        public ViewFeedbackForm()
+        {
+            InitializeComponent();
+        }
+
+        private void ViewFeedbackForm_Load(object sender, EventArgs e)
+        {
+            بارکردنی_فیدباکەکان();
+            ڕێکخستنی_داتاگرید();
+        }
+        private void بارکردنی_فیدباکەکان()
+        {
+            
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+                    string query = @"SELECT * FROM Feedbacks WHERE IsApproved = 1 ORDER BY FeedbackDate DESC";
+                    SqlDataAdapter adapter = new SqlDataAdapter(query, con);
+                    DataTable dt = new DataTable();
+                    adapter.Fill(dt);
+                    dataGridView1.DataSource = dt;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"هەڵە لە بارکردنی فیدباکەکان: {ex.Message}", "هەڵە");
+            }
+        }
+
+        private void ڕێکخستنی_داتاگرید()
+        {
+            try
+            {
+                if (dataGridView1.Columns.Count > 0)
+                {
+                    if (dataGridView1.Columns.Contains("CustomerName"))
+                    {
+                        dataGridView1.Columns["CustomerName"].HeaderText = "ناوی کڕیار";
+                        dataGridView1.Columns["CustomerName"].Width = 150;
+                    }
+
+                    if (dataGridView1.Columns.Contains("Rating"))
+                    {
+                        dataGridView1.Columns["Rating"].HeaderText = "هەڵسەنگاندن";
+                        dataGridView1.Columns["Rating"].Width = 80;
+                    }
+
+                    if (dataGridView1.Columns.Contains("Comment"))
+                    {
+                        dataGridView1.Columns["Comment"].HeaderText = "بۆچوون";
+                        dataGridView1.Columns["Comment"].Width = 250;
+                    }
+
+                    if (dataGridView1.Columns.Contains("ProductName"))
+                    {
+                        dataGridView1.Columns["ProductName"].HeaderText = "ناوی بەرهەم";
+                        dataGridView1.Columns["ProductName"].Width = 120;
+                    }
+
+                    if (dataGridView1.Columns.Contains("FeedbackDate"))
+                    {
+                        dataGridView1.Columns["FeedbackDate"].HeaderText = "بەروار";
+                        dataGridView1.Columns["FeedbackDate"].Width = 120;
+                        dataGridView1.Columns["FeedbackDate"].DefaultCellStyle.Format = "yyyy/MM/dd HH:mm";
+                    }
+
+                    if (dataGridView1.Columns.Contains("Id"))
+                        dataGridView1.Columns["Id"].Visible = false;
+
+                    if (dataGridView1.Columns.Contains("Email"))
+                        dataGridView1.Columns["Email"].Visible = false;
+
+                    if (dataGridView1.Columns.Contains("IsApproved"))
+                        dataGridView1.Columns["IsApproved"].Visible = false;
+                }
+
+                foreach (DataGridViewRow row in dataGridView1.Rows)
+                {
+                    if (row.Cells["Rating"].Value != null)
+                    {
+                        int rating = Convert.ToInt32(row.Cells["Rating"].Value);
+                        if (rating == 5)
+                            row.DefaultCellStyle.BackColor = System.Drawing.Color.LightGreen;
+                        else if (rating == 4)
+                            row.DefaultCellStyle.BackColor = System.Drawing.Color.LightBlue;
+                        else if (rating == 3)
+                            row.DefaultCellStyle.BackColor = System.Drawing.Color.LightYellow;
+                        else if (rating <= 2)
+                            row.DefaultCellStyle.BackColor = System.Drawing.Color.LightCoral;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"هەڵە لە ڕێکخستنی داتاگرید: {ex.Message}", "هەڵە");
+            }
+        }
+
+        private void btnRefresh_Click(object sender, EventArgs e)
+        {
+            بارکردنی_فیدباکەکان();
+            ڕێکخستنی_داتاگرید();
+        }
+
+        private void btnSearch_Click(object sender, EventArgs e)
+        {
+            گەڕان(txtSearch.Text);
+        private void btnSearch_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar == (char)Keys.Enter)
+            {
+                گەڕان(txtSearch.Text);
+            }
+        private void گەڕان(string searchText)
+        {
+            if (string.IsNullOrEmpty(searchText))
+            {
+                بارکردنی_فیدباکەکان();
+                return;
+            }
+            try
+            {
+                using (SqlConnection con = new SqlConnection(connectionString))
+                {
+                    con.Open();
+                    string query = @"SELECT * FROM Feedbacks 
+                                   WHERE IsApproved = 1 AND 
+                                         (CustomerName LIKE @Search OR Comment LIKE @Search OR ProductName LIKE @Search)
+                                   ORDER BY FeedbackDate DESC";
+
+                    SqlDataAdapter adapter = new SqlDataAdapter(query, con);
+                    adapter.SelectCommand.Parameters.AddWithValue("@Search", "%" + searchText + "%");
+                    DataTable dt = new DataTable();
+                    adapter.Fill(dt);
+                    dataGridView1.DataSource = dt;
+                    ڕێکخستنی_داتاگرید();
+                }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"هەڵە لە گەڕان: {ex.Message}", "هەڵە");
+            }
+        private void btnShowAll_Click(object sender, EventArgs e)
+        {
+            بارکردنی_فیدباکەکان();
+            txtSearch.Clear();         } 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Data Base 
+SQL Localhost
+ 
+•	Admin 
+
+CREATE TABLE [dbo].[admin] (
+    [Id]   INT           IDENTITY (1, 1) NOT NULL,
+    [user] NVARCHAR (50) NOT NULL,
+    [pass] NVARCHAR (50) NOT NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+
+•	Admin Table
+
+CREATE TABLE [dbo].[AdminTable] (
+    [Id]   INT           IDENTITY (1, 1) NOT NULL,
+    [user] NVARCHAR (50) NOT NULL,
+    [pass] NVARCHAR (50) NOT NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+
+•	Admin TB
+
+CREATE TABLE [dbo].[AdminTb] (
+    [Id]   INT           IDENTITY (1, 1) NOT NULL,
+    [user] NVARCHAR (50) NOT NULL,
+    [pass] NVARCHAR (50) NOT NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)); 
+•	CardTransactions
+
+CREATE TABLE [dbo].[CardTransactions] (
+    [Id]            INT             IDENTITY (1, 1) NOT NULL,
+    [Transactions]  NVARCHAR (50)   NULL,
+    [CustomerName]  NVARCHAR (100)  NULL,
+    [FuelType]      NVARCHAR (50)   NULL,
+    [Quantity]      DECIMAL (18, 2) NULL,
+    [TotalAmount]   DECIMAL (18, 2) NULL,
+    [PaymentMethod] NVARCHAR (50)   NULL,
+    [Status]        NVARCHAR (50)   NULL,
+    [BarcodeData]   NVARCHAR (100)  NULL,
+    [CreatedDate]   DATETIME        NULL,
+    [CompletedDate] DATETIME        NULL,
+    [barcodenumber] NVARCHAR (50)   NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);  
+
+•	Feedbacks
+
+CREATE TABLE [dbo].[Feedbacks] (
+    [Id]           INT            IDENTITY (1, 1) NOT NULL,
+    [CustomerName] NVARCHAR (100) NULL,
+    [Email]        NVARCHAR (100) NULL,
+    [Rating]       INT            NULL,
+    [Comment]      NVARCHAR (500) NULL,
+    [ProductName]  NVARCHAR (100) NULL,
+    [FeedbackDate] DATETIME       NULL,
+    [IsApproved]   BIT            DEFAULT ((1)) NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+ 
+•	Fuel stock
+
+CREATE TABLE [dbo].[FuelStock] (
+    [Id]            INT             IDENTITY (1, 1) NOT NULL,
+    [FuelType]      NVARCHAR (50)   NULL,
+    [Quantity]      DECIMAL (18, 2) NULL,
+    [PurchasePrice] DECIMAL (18, 2) NULL,
+    [Supplier]      NVARCHAR (100)  NULL,
+    [AddedDate]     DATETIME        NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+ 
+
+•	Inventory
+
+CREATE TABLE [dbo].[Inventory] (
+    [Id]          INT           IDENTITY (1, 1) NOT NULL,
+    [FuelType]    NVARCHAR (50) NULL,
+    [Quantity]    FLOAT (53)    NULL,
+    [LastUpdated] DATETIME      NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);  
+
+•	Products
+
+CREATE TABLE [dbo].[Products] (
+    [Id]            INT             IDENTITY (1, 1) NOT NULL,
+    [FuelType]      NVARCHAR (50)   NOT NULL,
+    [Quantity]      NUMERIC (18)    NOT NULL,
+    [PricePerLiter] DECIMAL (18, 2) NOT NULL,
+    [Supplier]      NVARCHAR (50)   NULL,
+    [EntryDate]     DATETIME        NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+ 
+•	 Sales
+
+CREATE TABLE [dbo].[Sales] (
+    [Id]            INT             IDENTITY (1, 1) NOT NULL,
+    [FuelType]      NVARCHAR (50)   NOT NULL,
+    [Quantity]      DECIMAL (18, 2) NOT NULL,
+    [PricePerLiter] DECIMAL (18, 2) NOT NULL,
+    [TotalAmount]   DECIMAL (18, 2) NOT NULL,
+    [CustomerName]  NVARCHAR (100)  NOT NULL,
+    [VehicleNumber] NVARCHAR (50)   NULL,
+    [SaleDate]      DATETIME        DEFAULT (getdate()) NOT NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+ 
+•	Settings
+CREATE TABLE [dbo].[Settings] (
+    [Id]           INT            IDENTITY (1, 1) NOT NULL,
+    [StationName]  NVARCHAR (100) NULL,
+    [SuperPrice]   FLOAT (53)     NULL,
+    [RegularPrice] FLOAT (53)     NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+ 
+•	 StationCardScans
+CREATE TABLE [dbo].[StationCardScans] (
+    [Id]                INT             IDENTITY (1, 1) NOT NULL,
+    [ScanId]            NVARCHAR (50)   NOT NULL,
+    [TransactionId]     NVARCHAR (50)   NOT NULL,
+    [StationCardNumber] NVARCHAR (50)   NOT NULL,
+    [StationName]       NVARCHAR (100)  NOT NULL,
+    [ScanTime]          DATETIME        NOT NULL,
+    [Amount]            DECIMAL (18, 2) NOT NULL,
+    [FuelType]          NVARCHAR (50)   NOT NULL,
+    [CustomerName]      NVARCHAR (100)  NOT NULL,
+    [ScanResult]        NVARCHAR (50)   DEFAULT ('?????????') NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+ 
+•	User
+
+
+CREATE TABLE [dbo].[Users] (
+    [Id]       INT           IDENTITY (1, 1) NOT NULL,
+    [Username] NVARCHAR (50) NOT NULL,
+    [Password] NVARCHAR (50) NOT NULL,
+    [phone]    NUMERIC (18)  NULL,
+    PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+
